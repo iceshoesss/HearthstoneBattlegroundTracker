@@ -1494,8 +1494,15 @@ public class GameMonitorService : IDisposable
                 OnMmrChanged?.Invoke(ratingInfo.Rating);
                 Log($"MMR: {ratingInfo.Rating}");
             }
+            else
+            {
+                Log($"[Debug] TryReadMmr: ratingInfo={ratingInfo?.Rating ?? 0}");
+            }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Log($"[Debug] TryReadMmr 异常: {ex.Message}");
+        }
     }
 
     private bool TryReadAvailableRaces()

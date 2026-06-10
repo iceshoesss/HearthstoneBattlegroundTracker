@@ -9,7 +9,7 @@
     <NoWarn>CS8632;CS0649</NoWarn>
     <RootNamespace>HearthstoneBattlegroundTracker</RootNamespace>
     <AssemblyName>HearthstoneBattlegroundTracker</AssemblyName>
-    <Version>0.3.0</Version>
+    <Version>0.5.5</Version>
     <Description>HearthstoneBattlegroundTracker</Description>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>

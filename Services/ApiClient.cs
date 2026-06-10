@@ -232,10 +232,9 @@ public static class ApiClient
             ["playerId"] = playerId,
             ["accountIdHi"] = accountIdHi.ToString(),
             ["accountIdLo"] = accountIdLo.ToString(),
-            ["region"] = region
+            ["region"] = region,
+            ["rating"] = rating
         };
-        if (rating > 0)
-            body["rating"] = rating;
 
         try
         {
@@ -541,6 +540,8 @@ public static class ApiClient
         var jsonBody = SimpleJsonSerialize(body);
         var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
 
+        Console.WriteLine($"[API] → {path} body={jsonBody}");
+
         var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
         request.Headers.Add("X-HDT-Plugin", _pluginVersion);
         if (!string.IsNullOrEmpty(ApiKey))
@@ -548,6 +549,8 @@ public static class ApiClient
 
         var response = await _http.SendAsync(request);
         var respBody = await response.Content.ReadAsStringAsync();
+
+        Console.WriteLine($"[API] ← {path} {(int)response.StatusCode} {respBody}");
 
         if (!response.IsSuccessStatusCode)
         {
