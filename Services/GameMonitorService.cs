@@ -673,9 +673,11 @@ public class GameMonitorService : IDisposable
 
                 var heroCardId = _hm.GetLeaderboardHoveredHeroCardId();
 
-                // 从 EntityTracker 获取悬停英雄的 PLAYER_ID（Power.log 数据，最可靠）
-                int playerId = 0;
-                if (!string.IsNullOrEmpty(heroCardId))
+                // 优先从 tile 直接读取 PLAYER_ID（不受畸变影响）
+                int playerId = _hm.GetLeaderboardHoveredPlayerId();
+
+                // fallback: 从 EntityTracker 获取（畸变时可能不准）
+                if (playerId == 0 && !string.IsNullOrEmpty(heroCardId))
                 {
                     var localController = _hm.GetLocalControllerIdPublic();
                     if (localController != null)
@@ -794,20 +796,12 @@ public class GameMonitorService : IDisposable
             var opponentMinions = _entityTracker.GetOpponentMinions(localController.Value);
             Log($"[Debug] EntityTracker 返回对手随从: {opponentMinions.Count}个");
 
-            // 用 BGSpy 获取对手英雄 cardId
-            var boardState = _hm.GetOpponentBoardState();
-            var heroCardId = boardState?.HeroCardId ?? _hm.GetOpponentHeroCardId() ?? "";
+            // 直接从 EntityTracker 获取对手英雄（不受畸变影响）
+            var opponentHero = _entityTracker.GetOpponentHero(localController.Value);
+            var heroCardId = opponentHero?.CardId ?? _hm.GetOpponentHeroCardId() ?? "";
 
-            // 从 EntityTracker 获取对手的 PLAYER_ID（Power.log 数据，最可靠）
-            int playerId = 0;
-            foreach (var entity in _entityTracker.Entities.Values)
-            {
-                if (entity.IsHero && entity.CardId == heroCardId && entity.Controller != localController.Value && entity.Controller > 0)
-                {
-                    playerId = entity.GetTag(2); // PLAYER_ID
-                    break;
-                }
-            }
+            // 从对手英雄实体读取 PLAYER_ID
+            int playerId = opponentHero?.GetTag(2) ?? 0; // PLAYER_ID
 
             Log($"[Debug] 英雄: {heroCardId}, playerId={playerId}");
 
@@ -958,27 +952,13 @@ public class GameMonitorService : IDisposable
                 return;
             }
 
-            var heroCardId = boardState.HeroCardId ?? "";
-            if (string.IsNullOrEmpty(heroCardId))
-            {
-                Log("[Snapshot] 英雄 CardId 为空");
-                return;
-            }
-
-            // 从 EntityTracker 获取对手的 PLAYER_ID（Power.log 数据，最可靠）
+            // 直接从 EntityTracker 获取对手英雄（不受畸变影响）
             var localController = _hm.GetLocalControllerIdPublic();
-            int playerId = 0;
-            if (localController != null)
-            {
-                foreach (var entity in _entityTracker.Entities.Values)
-                {
-                    if (entity.IsHero && entity.CardId == heroCardId && entity.Controller != localController.Value && entity.Controller > 0)
-                    {
-                        playerId = entity.GetTag(2); // PLAYER_ID
-                        break;
-                    }
-                }
-            }
+            var opponentHero = localController != null ? _entityTracker.GetOpponentHero(localController.Value) : null;
+            var heroCardId = opponentHero?.CardId ?? boardState.HeroCardId ?? "";
+
+            // 从对手英雄实体读取 PLAYER_ID
+            int playerId = opponentHero?.GetTag(2) ?? 0; // PLAYER_ID
 
             // 转换为字典格式，限制最多 7 个随从（BG 场面上限）
             var boardDicts = new List<Dictionary<string, object>>();

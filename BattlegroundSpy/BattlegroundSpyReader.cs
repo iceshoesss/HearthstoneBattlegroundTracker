@@ -684,7 +684,8 @@ public sealed class BattlegroundSpyReader : IDisposable
     /// <summary>
     /// 获取鼠标悬停的排行榜玩家的 PLAYER_ID (tag 2)。
     /// 用于缓存键匹配，比 heroCardId 更可靠（唯一、不重复）。
-    /// 流程: tile entity → hero card ID → m_entityMap 查找 → tag 2 (PLAYER_ID)
+    /// 优先直接从 tile.m_playerId 读取（不受畸变影响），
+    /// fallback 到 tile.m_playerMap 中查找。
     /// </summary>
     public int GetLeaderboardHoveredPlayerId()
     {
@@ -696,15 +697,27 @@ public sealed class BattlegroundSpyReader : IDisposable
             dynamic tile = leaderboard["m_currentlyMousedOverTile"];
             if (tile == null) return 0;
 
+            // 优先直接从 tile 读取 m_playerId（不受畸变影响）
+            try
+            {
+                int directPlayerId = (int)tile["m_playerId"];
+                if (directPlayerId != 0) return directPlayerId;
+            }
+            catch { }
+
+            // fallback: 从 entity 的 tags 读取 PLAYER_ID
             dynamic entity = tile["m_entity"];
             if (entity == null) return 0;
 
-            // 从 tile entity 读取 hero card ID（这个是可靠的）
+            var tags = ReadTagDict(entity["m_tags"]?["m_values"]);
+            int playerId = GetTagValue(tags, 2); // PLAYER_ID
+            if (playerId != 0) return playerId;
+
+            // 最后 fallback: 用 hero card ID 查找（畸变时可能不准）
             string heroCardId = null;
             try { heroCardId = (string)entity["m_cardIdInternal"]; } catch { }
             if (string.IsNullOrEmpty(heroCardId)) return 0;
 
-            // 用 hero card ID 在 m_entityMap 中查找 game entity，读取 PLAYER_ID
             return GetPlayerIdByHeroCardId(heroCardId);
         }
         catch
