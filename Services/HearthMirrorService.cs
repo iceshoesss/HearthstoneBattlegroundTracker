@@ -263,6 +263,13 @@ public class HearthMirrorService : IDisposable
         catch (Exception ex) { Console.WriteLine($"[HM] GetNextOpponentHeroCardId failed: {ex.Message}"); return null; }
     }
 
+    /// <summary>Get next opponent's PLAYER_ID (from NEXT_OPPONENT_PLAYER_ID tag). 畸变时可用。</summary>
+    public int GetNextOpponentPlayerId()
+    {
+        try { return GetSpy().GetNextOpponentPlayerId(); }
+        catch (Exception ex) { Console.WriteLine($"[HM] GetNextOpponentPlayerId failed: {ex.Message}"); return 0; }
+    }
+
     /// <summary>Get Duos teammate board state</summary>
     public BattlegroundsTeammateBoardState GetTeammateBoardState()
     {
