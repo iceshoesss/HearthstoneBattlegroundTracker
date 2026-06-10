@@ -168,13 +168,12 @@
                 Visibility="Collapsed" MouseLeftButtonDown="ScoreboardPanel_MouseLeftButtonDown"
                 MouseLeftButtonUp="ScoreboardPanel_MouseLeftButtonUp" MouseMove="ScoreboardPanel_MouseMove">
             <StackPanel>
-                <!-- Header: race icons + gear/confirm -->
+                <!-- Header: gear/confirm -->
                 <Grid Margin="0,0,0,4">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <StackPanel x:Name="ScoreRacePanel" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     <Button x:Name="ScoreSettingsBtn" Grid.Column="1" Cursor="Hand" Padding="0"
                             Click="ScoreSettingsBtn_Click"
                             Background="Transparent" BorderBrush="Transparent" BorderThickness="0">

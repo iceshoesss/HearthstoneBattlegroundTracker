@@ -125,10 +125,9 @@ public partial class MainWindow : Window
         {
             if (scene == SceneMode.BACON)
             {
-                // 场景 15（战棋大厅）显示计分板，隐藏种族，隐藏拔线按钮
+                // 场景 15（战棋大厅）显示计分板，隐藏拔线按钮
                 _overlay?.ForceShow();
                 _overlay?.ShowScoreboard();
-                _overlay?.SetRacePanelVisible(false);
                 _overlay?.HideGameToolsPanel();
                 _overlay?.LoadScoreRecentGames(_monitor.GetRecentGames(9));
                 var startMmr = GameStore.GetTodayStartMmr(_monitor.PlayerName);
@@ -145,7 +144,6 @@ public partial class MainWindow : Window
                 {
                     // 15→4 或 0/-1→4（断线重连），一定是战棋
                     _overlay?.ShowScoreboard();
-                    _overlay?.SetRacePanelVisible(true);
                     _overlay?.ShowGameToolsPanel();
                     _overlay?.LoadScoreRecentGames(_monitor.GetRecentGames(9));
                     var startMmr = GameStore.GetTodayStartMmr(_monitor.PlayerName);
@@ -162,7 +160,6 @@ public partial class MainWindow : Window
                             if (mode == "BG")
                             {
                                 _overlay?.ShowScoreboard();
-                                _overlay?.SetRacePanelVisible(true);
                                 _overlay?.ShowGameToolsPanel();
                                 _overlay?.LoadScoreRecentGames(_monitor.GetRecentGames(9));
                                 var startMmr = GameStore.GetTodayStartMmr(_monitor.PlayerName);

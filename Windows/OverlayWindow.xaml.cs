@@ -193,7 +193,6 @@ public partial class OverlayWindow : Window
         {
             _availableRaces = raceCodes;
             LoadRaceFilters();
-            LoadScoreRaceIcons(raceCodes);
             LoadGameToolsRaceIcons(raceCodes);
         });
     }
@@ -205,33 +204,6 @@ public partial class OverlayWindow : Window
         {"Quilboar", "quilboar"}, {"Naga", "naga"}, {"Undead", "undead"},
     };
 
-    private void LoadScoreRaceIcons(List<string> raceCodes)
-    {
-        ScoreRacePanel.Children.Clear();
-        foreach (var code in raceCodes)
-        {
-            if (!RaceImageMap.TryGetValue(code, out var imgName)) continue;
-            var chinese = CardDatabaseService.GetRaceChinese(code);
-
-            var panel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(3, 0, 3, 0) };
-            var ellipse = new System.Windows.Shapes.Ellipse
-            {
-                Width = 26, Height = 26,
-                Fill = new System.Windows.Media.ImageBrush(
-                    new System.Windows.Media.Imaging.BitmapImage(
-                        new Uri($"pack://application:,,,/Resources/TribeIcons/{imgName}.jpg"))),
-            };
-            var label = new TextBlock
-            {
-                Text = chinese, FontSize = 8, Foreground = System.Windows.Media.Brushes.White,
-                HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 0),
-            };
-            panel.Children.Add(ellipse);
-            panel.Children.Add(label);
-            ScoreRacePanel.Children.Add(panel);
-        }
-    }
-
     private void LoadGameToolsRaceIcons(List<string> raceCodes)
     {
         GameToolsRacePanel.Children.Clear();
@@ -240,17 +212,17 @@ public partial class OverlayWindow : Window
             if (!RaceImageMap.TryGetValue(code, out var imgName)) continue;
             var chinese = CardDatabaseService.GetRaceChinese(code);
 
-            var panel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(4, 0, 4, 0) };
+            var panel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(6, 0, 6, 0) };
             var ellipse = new System.Windows.Shapes.Ellipse
             {
-                Width = 28, Height = 28,
+                Width = 36, Height = 36,
                 Fill = new System.Windows.Media.ImageBrush(
                     new System.Windows.Media.Imaging.BitmapImage(
                         new Uri($"pack://application:,,,/Resources/TribeIcons/{imgName}.jpg"))),
             };
             var label = new TextBlock
             {
-                Text = chinese, FontSize = 9, Foreground = System.Windows.Media.Brushes.White,
+                Text = chinese, FontSize = 12, Foreground = System.Windows.Media.Brushes.White,
                 HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 0),
             };
             panel.Children.Add(ellipse);
@@ -770,11 +742,6 @@ public partial class OverlayWindow : Window
         Dispatcher.Invoke(() => ScoreboardPanel.Visibility = Visibility.Collapsed);
     }
 
-    public void SetRacePanelVisible(bool visible)
-    {
-        Dispatcher.Invoke(() => ScoreRacePanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed);
-    }
-
     public void UpdateScoreStartMmr(int mmr)
     {
         Dispatcher.Invoke(() => ScoreStartMmr.Text = mmr > 0 ? mmr.ToString() : "-");
@@ -974,14 +941,12 @@ public partial class OverlayWindow : Window
         if (_scoreSettingsOpen)
         {
             ScoreSettingsPanel.Visibility = Visibility.Visible;
-            ScoreRacePanel.Visibility = Visibility.Collapsed;
             ScoreGearIcon.Visibility = Visibility.Collapsed;
             ScoreConfirmBtn.Visibility = Visibility.Visible;
         }
         else
         {
             ScoreSettingsPanel.Visibility = Visibility.Collapsed;
-            ScoreRacePanel.Visibility = Visibility.Visible;
             ScoreGearIcon.Visibility = Visibility.Visible;
             ScoreConfirmBtn.Visibility = Visibility.Collapsed;
         }
