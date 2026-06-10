@@ -696,27 +696,15 @@ public sealed class BattlegroundSpyReader : IDisposable
             dynamic tile = leaderboard["m_currentlyMousedOverTile"];
             if (tile == null) return 0;
 
-            // 优先直接从 tile 读取 m_playerId（不受畸变影响）
-            try
-            {
-                int directPlayerId = (int)tile["m_playerId"];
-                if (directPlayerId != 0) return directPlayerId;
-            }
-            catch { }
-
-            // fallback: 从 entity 的 tags 读取 PLAYER_ID
             dynamic entity = tile["m_entity"];
             if (entity == null) return 0;
 
-            var tags = ReadTagDict(entity["m_tags"]?["m_values"]);
-            int playerId = GetTagValue(tags, 2); // PLAYER_ID
-            if (playerId != 0) return playerId;
-
-            // 最后 fallback: 用 hero card ID 查找（畸变时可能不准）
+            // 从 tile entity 读取 hero card ID（这个是可靠的）
             string heroCardId = null;
             try { heroCardId = (string)entity["m_cardIdInternal"]; } catch { }
             if (string.IsNullOrEmpty(heroCardId)) return 0;
 
+            // 用 hero card ID 在 m_entityMap 中查找 game entity，读取 PLAYER_ID
             return GetPlayerIdByHeroCardId(heroCardId);
         }
         catch
@@ -1803,74 +1791,6 @@ public sealed class BattlegroundSpyReader : IDisposable
     /// 获取当前战斗对手的英雄卡牌 ID（通过 NEXT_OPPONENT_PLAYER_ID 标签）。
     /// 路径: GameState.s_instance.m_entityMap -> 找到 PLAYER_ID 匹配的 player entity -> 读取 NEXT_OPPONENT_PLAYER_ID 标签
     /// </summary>
-    /// <summary>
-    /// 获取当前对手的 PLAYER_ID（通过 NEXT_OPPONENT_PLAYER_ID 标签）。
-    /// 畸变时所有英雄相同，用此方法可唯一标识对手。
-    /// </summary>
-    public int GetNextOpponentPlayerId()
-    {
-        try
-        {
-            var gameState = _image?["GameState"]?["s_instance"];
-            if (gameState == null) return 0;
-
-            // 1. 获取本地玩家的 PLAYER_ID
-            int localPlayerId = 0;
-            dynamic playerMap = gameState["m_playerMap"];
-            if (playerMap != null)
-            {
-                dynamic keySlots = playerMap["keySlots"];
-                dynamic valueSlots = playerMap["valueSlots"];
-                if (keySlots != null && valueSlots != null)
-                {
-                    int count = GetCollectionSize(keySlots);
-                    for (int i = 0; i < count; i++)
-                    {
-                        dynamic player = valueSlots[i];
-                        if (player == null) continue;
-                        int side = (int)(player["m_side"] ?? -1);
-                        if (side == 1) // FRIENDLY
-                        {
-                            localPlayerId = (int)(keySlots[i] ?? 0);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (localPlayerId == 0) return 0;
-
-            // 2. 在 m_entityMap 中找到本地玩家的 player entity
-            dynamic entityMap = gameState["m_entityMap"];
-            if (entityMap == null) return 0;
-
-            dynamic slots = entityMap["valueSlots"];
-            if (slots == null) return 0;
-            int size = GetCollectionSize(slots);
-            if (size <= 0) return 0;
-
-            for (int i = 0; i < size; i++)
-            {
-                var node = slots[i];
-                if (node == null) continue;
-
-                var tags = ReadTagDict(node["m_tags"]?["m_values"]);
-                int playerId = GetTagValue(tags, 2); // PLAYER_ID = tag 2
-                if (playerId != localPlayerId) continue;
-
-                // 3. 读取 NEXT_OPPONENT_PLAYER_ID 标签 (tag 1427)
-                int nextOpponentId = GetTagValue(tags, 1427);
-                return nextOpponentId;
-            }
-
-            return 0;
-        }
-        catch
-        {
-            return 0;
-        }
-    }
-
     public string GetNextOpponentHeroCardId()
     {
         try
