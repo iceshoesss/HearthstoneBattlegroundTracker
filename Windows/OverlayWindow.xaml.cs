@@ -112,11 +112,8 @@ public partial class OverlayWindow : Window
     {
         _hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
 
-        // 卡牌浏览器始终显示，关闭 click-through 让按钮可点击
+        // BobsBuddy 始终显示
         BobsBuddyPanel.Visibility = Visibility.Visible;
-        CardBrowserPanel.Visibility = Visibility.Visible;
-        SetClickThrough(false);
-        LoadCardData();
 
         // 安装前台窗口切换钩子（即时回调，无轮询延迟）
         _winEventProc = OnForegroundChanged;
@@ -559,6 +556,14 @@ public partial class OverlayWindow : Window
     }
 
     private void CloseCardBrowser_Click(object sender, RoutedEventArgs e) => HideCardBrowser();
+
+    private void CardBrowserToggleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (CardBrowserPanel.Visibility == Visibility.Visible)
+            HideCardBrowser();
+        else
+            ShowCardBrowser();
+    }
 
     // === Opponent (read-only) ===
 
