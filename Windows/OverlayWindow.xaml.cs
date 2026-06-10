@@ -209,17 +209,17 @@ public partial class OverlayWindow : Window
             if (!RaceImageMap.TryGetValue(code, out var imgName)) continue;
             var chinese = CardDatabaseService.GetRaceChinese(code);
 
-            var panel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(6, 0, 6, 0) };
+            var panel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(5, 0, 5, 0) };
             var ellipse = new System.Windows.Shapes.Ellipse
             {
-                Width = 36, Height = 36,
+                Width = 29, Height = 29,
                 Fill = new System.Windows.Media.ImageBrush(
                     new System.Windows.Media.Imaging.BitmapImage(
                         new Uri($"pack://application:,,,/Resources/TribeIcons/{imgName}.jpg"))),
             };
             var label = new TextBlock
             {
-                Text = chinese, FontSize = 12, Foreground = System.Windows.Media.Brushes.White,
+                Text = chinese, FontSize = 10, Foreground = System.Windows.Media.Brushes.White,
                 HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 0),
             };
             panel.Children.Add(ellipse);
