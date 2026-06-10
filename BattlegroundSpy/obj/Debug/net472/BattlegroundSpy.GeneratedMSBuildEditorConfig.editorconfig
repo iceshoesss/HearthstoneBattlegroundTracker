@@ -1,6 +1,6 @@
 is_global = true
 build_property.RootNamespace = BattlegroundSpy
-build_property.ProjectDir = D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\BattlegroundSpy\
+build_property.ProjectDir = d:\coding\HBT\BattlegroundSpy\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.CsWinRTUseWindowsUIXamlProjections = false

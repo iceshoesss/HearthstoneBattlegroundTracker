@@ -1,6 +1,6 @@
 is_global = true
 build_property.RootNamespace = Hearthstone_Deck_Tracker
-build_property.ProjectDir = D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\Plugins\HdtCompat\
+build_property.ProjectDir = D:\coding\HBT\Plugins\HdtCompat\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.CsWinRTUseWindowsUIXamlProjections = false

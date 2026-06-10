@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\BattlegroundSpy\\BattlegroundSpy.csproj": {}
+    "D:\\coding\\HBT\\BattlegroundSpy\\BattlegroundSpy.csproj": {}
   },
   "projects": {
-    "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\BattlegroundSpy\\BattlegroundSpy.csproj": {
+    "D:\\coding\\HBT\\BattlegroundSpy\\BattlegroundSpy.csproj": {
       "version": "0.2.0",
       "restore": {
-        "projectUniqueName": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\BattlegroundSpy\\BattlegroundSpy.csproj",
+        "projectUniqueName": "D:\\coding\\HBT\\BattlegroundSpy\\BattlegroundSpy.csproj",
         "projectName": "BattlegroundSpy",
-        "projectPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\BattlegroundSpy\\BattlegroundSpy.csproj",
+        "projectPath": "D:\\coding\\HBT\\BattlegroundSpy\\BattlegroundSpy.csproj",
         "packagesPath": "C:\\Users\\cc\\.nuget\\packages\\",
-        "outputPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\BattlegroundSpy\\obj\\",
+        "outputPath": "D:\\coding\\HBT\\BattlegroundSpy\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

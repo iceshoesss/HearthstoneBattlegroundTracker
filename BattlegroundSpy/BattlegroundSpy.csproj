@@ -20,15 +20,15 @@
 
   <!-- UnitySpy core (MIT, source included) -->
   <ItemGroup>
-    <Compile Include="..\..\..\HDT_Reverse\unity-spy\UnitySpy\**\*.cs"
-             Exclude="..\..\..\HDT_Reverse\unity-spy\UnitySpy\obj\**;..\..\..\HDT_Reverse\unity-spy\UnitySpy\Properties\**;..\..\..\HDT_Reverse\unity-spy\UnitySpy\Crawler\**"
+    <Compile Include="..\..\HDT_Reverse\unity-spy\UnitySpy\**\*.cs"
+             Exclude="..\..\HDT_Reverse\unity-spy\UnitySpy\obj\**;..\..\HDT_Reverse\unity-spy\UnitySpy\Properties\**;..\..\HDT_Reverse\unity-spy\UnitySpy\Crawler\**"
              LinkBase="UnitySpy" />
   </ItemGroup>
 
   <!-- UnitySpy.HearthstoneLib (MIT, source included) -->
   <ItemGroup>
-    <Compile Include="..\..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\**\*.cs"
-             Exclude="..\..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\obj\**;..\..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\Properties\**;..\..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\Detail\Collection\CollectionBattlegroundsHeroSkinsReader.cs;..\..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\Detail\Collection\CollectionCardReader.cs;..\..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\Detail\Achievement\AchievementsInfoReader.cs;..\..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\MindVision.cs;..\..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\Detail\DungeonInfo\DungeonInfoReader.cs;..\..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\Detail\Deck\ActiveDeckReader.cs;..\..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\MemoryUpdate\**"
+    <Compile Include="..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\**\*.cs"
+             Exclude="..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\obj\**;..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\Properties\**;..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\Detail\Collection\CollectionBattlegroundsHeroSkinsReader.cs;..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\Detail\Collection\CollectionCardReader.cs;..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\Detail\Achievement\AchievementsInfoReader.cs;..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\MindVision.cs;..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\Detail\DungeonInfo\DungeonInfoReader.cs;..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\Detail\Deck\ActiveDeckReader.cs;..\..\HDT_Reverse\unity-spy\UnitySpy.HearthstoneLib\MemoryUpdate\**"
              LinkBase="HearthstoneLib" />
   </ItemGroup>
 

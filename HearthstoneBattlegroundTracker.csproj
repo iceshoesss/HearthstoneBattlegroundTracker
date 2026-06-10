@@ -11,7 +11,7 @@
     <AssemblyName>HearthstoneBattlegroundTracker</AssemblyName>
     <Version>0.3.0</Version>
     <Description>HearthstoneBattlegroundTracker</Description>
-    <ApplicationIcon>..\LeagueTool\icon.ico</ApplicationIcon>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
@@ -49,7 +49,7 @@
 
   <!-- Icon -->
   <ItemGroup>
-    <Content Include="..\LeagueTool\icon.ico" CopyToOutputDirectory="PreserveNewest" Link="icon.ico" />
+    <Content Include="icon.ico" CopyToOutputDirectory="PreserveNewest" Link="icon.ico" />
   </ItemGroup>
 
   <!-- Tribe icons -->

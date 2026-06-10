@@ -1,6 +1,6 @@
 is_global = true
 build_property.RootNamespace = BobsBuddy
-build_property.ProjectDir = D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\Plugins\BobsBuddyCompat\
+build_property.ProjectDir = d:\coding\HBT\Plugins\BobsBuddyCompat\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.CsWinRTUseWindowsUIXamlProjections = false

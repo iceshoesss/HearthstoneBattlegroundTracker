@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("BattlegroundSpy.Test")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+93637bac3797e27d3820a6a0173ea48955516636")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+07fb589adc2efaee41beb0db1f32d9530052e6b0")]
 [assembly: System.Reflection.AssemblyProductAttribute("BattlegroundSpy.Test")]
 [assembly: System.Reflection.AssemblyTitleAttribute("BattlegroundSpy.Test")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

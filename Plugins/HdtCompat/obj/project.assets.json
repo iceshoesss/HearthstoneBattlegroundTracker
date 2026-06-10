@@ -14,11 +14,11 @@
   "project": {
     "version": "1.52.14.7315",
     "restore": {
-      "projectUniqueName": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\HdtCompat\\HdtCompat.csproj",
+      "projectUniqueName": "D:\\coding\\HBT\\Plugins\\HdtCompat\\HdtCompat.csproj",
       "projectName": "HearthstoneDeckTracker",
-      "projectPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\HdtCompat\\HdtCompat.csproj",
+      "projectPath": "D:\\coding\\HBT\\Plugins\\HdtCompat\\HdtCompat.csproj",
       "packagesPath": "C:\\Users\\cc\\.nuget\\packages\\",
-      "outputPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\HdtCompat\\obj\\",
+      "outputPath": "D:\\coding\\HBT\\Plugins\\HdtCompat\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
