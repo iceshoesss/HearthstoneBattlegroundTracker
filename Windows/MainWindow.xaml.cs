@@ -179,11 +179,7 @@ public partial class MainWindow : Window
             }
         });
 
-        // 计分板：游戏结束添加记录
-        _monitor.OnGameEnded += record => Dispatcher.Invoke(() =>
-        {
-            _overlay?.AddScoreGame(record);
-        });
+        // 计分板：游戏结束后不立即显示，进入主菜单时由 LoadScoreRecentGames 统一加载
 
         // 对手阵容悬停
         _monitor.OnOpponentBoardHover += (heroCardId, boardState, turnsAgo, h2hText) => Dispatcher.Invoke(() =>

@@ -310,6 +310,7 @@
             <StackPanel Orientation="Horizontal">
                 <TextBlock x:Name="TurnNumberText" Text="" FontSize="18" FontWeight="Bold" Foreground="#e2e8f0"
                            VerticalAlignment="Center" Margin="0,0,14,0"/>
+                <StackPanel x:Name="GameToolsRacePanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0"/>
                 <Button x:Name="DisconnectBtn" Content="一键拔线"
                         Click="DisconnectBtn_Click"
                         Background="#555555" Foreground="White" FontWeight="Bold" FontSize="18"

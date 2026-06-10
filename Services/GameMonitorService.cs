@@ -1176,45 +1176,46 @@ public class GameMonitorService : IDisposable
             OnMmrChanged?.Invoke(rc.NewRating);
         }
 
+        // ── 计算 otherPlacements（所有对局共用）──
+        var otherPlacements = new List<(ulong lo, int placement)>();
+
+        // 从内存读取实时排名
+        var rankings = _hm.GetPlayerRankings();
+        if (rankings.Count > 0)
+        {
+            // 构建 teamId → Lo 映射（如果还没构建）
+            if (_teamIdToLo.Count == 0)
+                BuildTeamIdToLoMapping(rankings);
+
+            foreach (var (heroCardId, rank, isDead, teamId, playerId) in rankings)
+            {
+                // 排名比自己低的玩家
+                if (rank > placement)
+                {
+                    // 用 teamId 查找 Lo
+                    if (_teamIdToLo.TryGetValue(teamId, out var lo) && lo != 0 && lo != _localPlayerLo)
+                        otherPlacements.Add((lo, rank));
+                }
+            }
+        }
+        else
+        {
+            // 备用方案：从 AllHeroes 读取（Power.log 解析的数据）
+            foreach (var hero in _currentGame.AllHeroes.Values)
+            {
+                if (hero.Placement > placement)
+                {
+                    var matched = _currentGame.LobbyPlayers.FirstOrDefault(lp =>
+                        string.Equals(lp.HeroCardId, hero.CardId, StringComparison.OrdinalIgnoreCase));
+                    if (matched != null && matched.Lo != 0 && matched.Lo != _localPlayerLo)
+                        otherPlacements.Add((matched.Lo, hero.Placement));
+                }
+            }
+        }
+
         // ── update-placement（仅联赛对局）──
         if (_league.IsLeagueGame && !string.IsNullOrEmpty(_currentGameUuid))
         {
-            var otherPlacements = new List<(ulong lo, int placement)>();
-
-            // 从内存读取实时排名
-            var rankings = _hm.GetPlayerRankings();
-            if (rankings.Count > 0)
-            {
-                // 构建 teamId → Lo 映射（如果还没构建）
-                if (_teamIdToLo.Count == 0)
-                    BuildTeamIdToLoMapping(rankings);
-
-                foreach (var (heroCardId, rank, isDead, teamId, playerId) in rankings)
-                {
-                    // 排名比自己低的玩家
-                    if (rank > placement)
-                    {
-                        // 用 teamId 查找 Lo
-                        if (_teamIdToLo.TryGetValue(teamId, out var lo) && lo != 0 && lo != _localPlayerLo)
-                            otherPlacements.Add((lo, rank));
-                    }
-                }
-            }
-            else
-            {
-                // 备用方案：从 AllHeroes 读取（Power.log 解析的数据）
-                foreach (var hero in _currentGame.AllHeroes.Values)
-                {
-                    if (hero.Placement > placement)
-                    {
-                        var matched = _currentGame.LobbyPlayers.FirstOrDefault(lp =>
-                            string.Equals(lp.HeroCardId, hero.CardId, StringComparison.OrdinalIgnoreCase));
-                        if (matched != null && matched.Lo != 0 && matched.Lo != _localPlayerLo)
-                            otherPlacements.Add((matched.Lo, hero.Placement));
-                    }
-                }
-            }
-
             for (int attempt = 0; attempt < 3; attempt++)
             {
                 var ok = ApiClient.UpdatePlacementAsync(_currentGameUuid, _localPlayerBattleTag,
@@ -1230,16 +1231,16 @@ public class GameMonitorService : IDisposable
                 if (attempt < 2) Thread.Sleep(2000);
                 else Log("上传失败，已重试3次");
             }
+        }
 
-            // ── 记录对战胜负 ──
-            if (_localPlayerLo != 0)
+        // ── 记录对战胜负（所有对局）──
+        if (_localPlayerLo != 0)
+        {
+            var wonSet = new HashSet<ulong>(otherPlacements.Select(p => p.lo));
+            foreach (var lp in _currentGame.LobbyPlayers)
             {
-                var wonSet = new HashSet<ulong>(otherPlacements.Select(p => p.lo));
-                foreach (var lp in _currentGame.LobbyPlayers)
-                {
-                    if (lp.Lo == 0 || lp.Lo == _localPlayerLo) continue;
-                    HeadToHeadStore.RecordGame(lp.Lo, wonSet.Contains(lp.Lo));
-                }
+                if (lp.Lo == 0 || lp.Lo == _localPlayerLo) continue;
+                HeadToHeadStore.RecordGame(lp.Lo, wonSet.Contains(lp.Lo));
             }
         }
 

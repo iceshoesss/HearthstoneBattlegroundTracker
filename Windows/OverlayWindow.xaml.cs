@@ -194,14 +194,15 @@ public partial class OverlayWindow : Window
             _availableRaces = raceCodes;
             LoadRaceFilters();
             LoadScoreRaceIcons(raceCodes);
+            LoadGameToolsRaceIcons(raceCodes);
         });
     }
 
     private static readonly Dictionary<string, string> RaceImageMap = new Dictionary<string, string>
     {
-        {"PET", "pet"}, {"MECHANICAL", "mech"}, {"MURLOC", "murloc"}, {"DEMON", "demon"},
-        {"DRAGON", "dragon"}, {"PIRATE", "pirate"}, {"ELEMENTAL", "elemental"},
-        {"QUILBOAR", "quilboar"}, {"NAGA", "naga"}, {"UNDEAD", "undead"},
+        {"Beast", "pet"}, {"Mech", "mech"}, {"Murloc", "murloc"}, {"Demon", "demon"},
+        {"Dragon", "dragon"}, {"Pirate", "pirate"}, {"Elemental", "elemental"},
+        {"Quilboar", "quilboar"}, {"Naga", "naga"}, {"Undead", "undead"},
     };
 
     private void LoadScoreRaceIcons(List<string> raceCodes)
@@ -228,6 +229,33 @@ public partial class OverlayWindow : Window
             panel.Children.Add(ellipse);
             panel.Children.Add(label);
             ScoreRacePanel.Children.Add(panel);
+        }
+    }
+
+    private void LoadGameToolsRaceIcons(List<string> raceCodes)
+    {
+        GameToolsRacePanel.Children.Clear();
+        foreach (var code in raceCodes)
+        {
+            if (!RaceImageMap.TryGetValue(code, out var imgName)) continue;
+            var chinese = CardDatabaseService.GetRaceChinese(code);
+
+            var panel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(4, 0, 4, 0) };
+            var ellipse = new System.Windows.Shapes.Ellipse
+            {
+                Width = 28, Height = 28,
+                Fill = new System.Windows.Media.ImageBrush(
+                    new System.Windows.Media.Imaging.BitmapImage(
+                        new Uri($"pack://application:,,,/Resources/TribeIcons/{imgName}.jpg"))),
+            };
+            var label = new TextBlock
+            {
+                Text = chinese, FontSize = 9, Foreground = System.Windows.Media.Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 0),
+            };
+            panel.Children.Add(ellipse);
+            panel.Children.Add(label);
+            GameToolsRacePanel.Children.Add(panel);
         }
     }
 
@@ -794,7 +822,7 @@ public partial class OverlayWindow : Window
             // 先用缓存/占位符
             var heroImage = _imgCache256.GetTileOrPlaceholder(heroCardId);
 
-            _scoreGames.Add(new ScoreboardGameDisplay
+            _scoreGames.Insert(0, new ScoreboardGameDisplay
             {
                 GameUuid = record.GameUuid ?? "",
                 HeroName = heroName,
