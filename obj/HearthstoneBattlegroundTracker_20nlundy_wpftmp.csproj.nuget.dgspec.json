@@ -1,0 +1,243 @@
+{
+  "format": 1,
+  "restore": {
+    "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\HearthstoneBattlegroundTracker.csproj": {}
+  },
+  "projects": {
+    "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\BattlegroundSpy\\BattlegroundSpy.csproj": {
+      "version": "0.2.0",
+      "restore": {
+        "projectUniqueName": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\BattlegroundSpy\\BattlegroundSpy.csproj",
+        "projectName": "BattlegroundSpy",
+        "projectPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\BattlegroundSpy\\BattlegroundSpy.csproj",
+        "packagesPath": "C:\\Users\\cc\\.nuget\\packages\\",
+        "outputPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\BattlegroundSpy\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\cc\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net472"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net472": {
+            "targetAlias": "net472",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net472": {
+          "targetAlias": "net472",
+          "dependencies": {
+            "JetBrains.Annotations": {
+              "target": "Package",
+              "version": "[2024.2.0, )"
+            },
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.3, )"
+            },
+            "System.ValueTuple": {
+              "target": "Package",
+              "version": "[4.5.0, )"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.301\\RuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\HearthstoneBattlegroundTracker.csproj": {
+      "version": "0.3.0",
+      "restore": {
+        "projectUniqueName": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\HearthstoneBattlegroundTracker.csproj",
+        "projectName": "HearthstoneBattlegroundTracker",
+        "projectPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\HearthstoneBattlegroundTracker.csproj",
+        "packagesPath": "C:\\Users\\cc\\.nuget\\packages\\",
+        "outputPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\cc\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net472"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net472": {
+            "targetAlias": "net472",
+            "projectReferences": {
+              "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\BattlegroundSpy\\BattlegroundSpy.csproj": {
+                "projectPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\BattlegroundSpy\\BattlegroundSpy.csproj"
+              },
+              "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\BobsBuddyCompat\\BobsBuddyCompat.csproj": {
+                "projectPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\BobsBuddyCompat\\BobsBuddyCompat.csproj"
+              },
+              "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\HdtCompat\\HdtCompat.csproj": {
+                "projectPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\HdtCompat\\HdtCompat.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net472": {
+          "targetAlias": "net472",
+          "dependencies": {
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.3, )"
+            },
+            "WindowsFirewallHelper": {
+              "target": "Package",
+              "version": "[2.1.4.81, )"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.301\\RuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "win-x86": {
+          "#import": []
+        }
+      }
+    },
+    "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\BobsBuddyCompat\\BobsBuddyCompat.csproj": {
+      "version": "1.34.3",
+      "restore": {
+        "projectUniqueName": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\BobsBuddyCompat\\BobsBuddyCompat.csproj",
+        "projectName": "BobsBuddy",
+        "projectPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\BobsBuddyCompat\\BobsBuddyCompat.csproj",
+        "packagesPath": "C:\\Users\\cc\\.nuget\\packages\\",
+        "outputPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\BobsBuddyCompat\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\cc\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net472"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net472": {
+            "targetAlias": "net472",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net472": {
+          "targetAlias": "net472",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.301\\RuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\HdtCompat\\HdtCompat.csproj": {
+      "version": "1.52.14.7315",
+      "restore": {
+        "projectUniqueName": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\HdtCompat\\HdtCompat.csproj",
+        "projectName": "HearthstoneDeckTracker",
+        "projectPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\HdtCompat\\HdtCompat.csproj",
+        "packagesPath": "C:\\Users\\cc\\.nuget\\packages\\",
+        "outputPath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\Plugins\\HdtCompat\\obj\\",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
+        "configFilePaths": [
+          "C:\\Users\\cc\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net472"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net472": {
+            "targetAlias": "net472",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net472": {
+          "targetAlias": "net472",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.301\\RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

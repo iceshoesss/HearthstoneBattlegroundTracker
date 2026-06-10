@@ -1,0 +1,245 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using Microsoft.Win32;
+
+namespace HBT
+{
+
+/// <summary>
+/// 自动查找炉石 Power.log 路径
+/// </summary>
+public static class LogPathFinder
+{
+    /// <summary>
+    /// 查找最新的 Power.log，可指定自定义路径
+    /// </summary>
+    public static string? Find(string? customPath = null)
+    {
+        if (!string.IsNullOrEmpty(customPath))
+        {
+            if (File.Exists(customPath)) return customPath;
+            Console.WriteLine($"❌ 文件不存在: {customPath}");
+            return null;
+        }
+
+        // 注册表查找
+        var installDir = FindHsInstallDir();
+        if (installDir != null)
+        {
+            var logPath = FindLogInDir(Path.Combine(installDir, "Logs"));
+            if (logPath != null) return logPath;
+        }
+
+        // 从运行中的炉石进程获取安装路径（HDT 同款方案）
+        var processDir = FindHsDirFromProcess();
+        if (processDir != null)
+        {
+            var logPath = FindLogInDir(Path.Combine(processDir, "Logs"));
+            if (logPath != null) return logPath;
+        }
+
+        // 常见路径兜底
+        var triedPaths = new List<string>();
+        var candidateDirs = new List<string>
+        {
+            @"D:\Battle.net\Hearthstone\Logs",
+            @"C:\Program Files (x86)\Hearthstone\Logs",
+            @"C:\Program Files\Hearthstone\Logs",
+            @"D:\Hearthstone\Logs",
+            // 国服常见中文路径
+            @"D:\暴雪战网\炉石传说\Hearthstone\Logs",
+            @"C:\暴雪战网\炉石传说\Hearthstone\Logs",
+            @"E:\暴雪战网\炉石传说\Hearthstone\Logs",
+            @"D:\暴雪战网\Hearthstone\Logs",
+            @"C:\暴雪战网\Hearthstone\Logs",
+            @"E:\暴雪战网\Hearthstone\Logs",
+        };
+
+        // 扫描所有盘符下匹配 *Hearthstone* 或 *炉石* 的目录
+        foreach (var drive in DriveInfo.GetDrives())
+        {
+            if (drive.DriveType != DriveType.Fixed || !drive.IsReady) continue;
+            var root = drive.RootDirectory.FullName;
+            foreach (var pattern in new[] { "*Hearthstone*", "*炉石*" })
+            {
+                try
+                {
+                    foreach (var dir in Directory.GetDirectories(root, pattern))
+                    {
+                        var logsPath = Path.Combine(dir, "Logs");
+                        if (!candidateDirs.Contains(logsPath, StringComparer.OrdinalIgnoreCase))
+                            candidateDirs.Add(logsPath);
+                        // 也检查 Battle.net 子目录
+                        var bnLogs = Path.Combine(dir, "Hearthstone", "Logs");
+                        if (!candidateDirs.Contains(bnLogs, StringComparer.OrdinalIgnoreCase))
+                            candidateDirs.Add(bnLogs);
+                    }
+                }
+                catch { } // 跳过无权限的目录
+            }
+        }
+
+        foreach (var logsDir in candidateDirs)
+        {
+            var logPath = FindLogInDir(logsDir);
+            if (logPath != null) return logPath;
+            if (Directory.Exists(logsDir))
+                triedPaths.Add($"{logsDir}（存在但无 Power.log）");
+            else
+                triedPaths.Add($"{logsDir}（不存在）");
+        }
+
+        // 首次失败时输出诊断，避免每次重试都刷屏
+        if (!_diagnosed)
+        {
+            _diagnosed = true;
+        }
+        return null;
+    }
+
+    private static bool _diagnosed;
+
+    /// <summary>
+    /// 检查是否有更新的日志文件（游戏重启时切换）
+    /// </summary>
+    public static string? CheckNewLogFile(string currentPath)
+    {
+        var currentDir = Path.GetDirectoryName(currentPath)!;
+        var parent = Path.GetDirectoryName(currentDir);
+        var basename = Path.GetFileName(currentDir);
+        var logsDir = basename?.StartsWith("Hearthstone_") == true ? parent! : currentDir;
+
+        if (!Directory.Exists(logsDir)) return null;
+
+        var candidates = new List<(DateTime mtime, string path)>();
+
+        // Hearthstone_* 子目录
+        foreach (var folder in Directory.GetDirectories(logsDir, "Hearthstone_*"))
+        {
+            var p = Path.Combine(folder, "Power.log");
+            if (File.Exists(p) && !string.Equals(
+                Path.GetFullPath(p), Path.GetFullPath(currentPath),
+                StringComparison.OrdinalIgnoreCase))
+            {
+                candidates.Add((File.GetLastWriteTimeUtc(p), p));
+            }
+        }
+
+        // 根目录 Power.log
+        var rootLog = Path.Combine(logsDir, "Power.log");
+        if (File.Exists(rootLog) && !string.Equals(
+            Path.GetFullPath(rootLog), Path.GetFullPath(currentPath),
+            StringComparison.OrdinalIgnoreCase))
+        {
+            candidates.Add((File.GetLastWriteTimeUtc(rootLog), rootLog));
+        }
+
+        if (candidates.Count == 0) return null;
+
+        DateTime currentMtime;
+        try { currentMtime = File.GetLastWriteTimeUtc(currentPath); }
+        catch { currentMtime = DateTime.MinValue; }
+
+        var newest = candidates.OrderByDescending(c => c.mtime).First();
+        return newest.mtime > currentMtime ? newest.path : null;
+    }
+
+    private static string? FindHsInstallDir()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(
+                @"SOFTWARE\WOW6432Node\Blizzard Entertainment\Hearthstone");
+            var p = key?.GetValue("InstallPath") as string;
+            if (!string.IsNullOrEmpty(p) && Directory.Exists(p)) return p;
+        }
+        catch { }
+
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(
+                @"SOFTWARE\Blizzard Entertainment\Hearthstone");
+            var p = key?.GetValue("InstallPath") as string;
+            if (!string.IsNullOrEmpty(p) && Directory.Exists(p)) return p;
+        }
+        catch { }
+
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(
+                @"SOFTWARE\Blizzard Entertainment\Hearthstone");
+            var p = key?.GetValue("InstallPath") as string;
+            if (!string.IsNullOrEmpty(p) && Directory.Exists(p)) return p;
+        }
+        catch { }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 从运行中的炉石进程获取安装目录（HDT 同款方案）
+    /// </summary>
+    private static string? FindHsDirFromProcess()
+    {
+        if (_processDirCached) return _processDir;
+        _processDirCached = true;
+
+        try
+        {
+            var procs = Process.GetProcessesByName("Hearthstone");
+            if (procs.Length == 0) return null;
+
+            var exePath = procs[0].MainModule?.FileName;
+            if (string.IsNullOrEmpty(exePath)) return null;
+
+            var dir = Path.GetDirectoryName(exePath);
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+            {
+                _processDir = dir;
+                return dir;
+            }
+        }
+        catch
+        {
+            // MainModule 可能因权限不足抛异常，静默忽略
+        }
+        return null;
+    }
+
+    private static string? _processDir;
+    private static bool _processDirCached;
+
+    /// <summary>
+    /// 重置进程路径缓存（炉石重启后调用，允许重新查找安装目录）
+    /// </summary>
+    public static void ResetProcessDirCache()
+    {
+        _processDirCached = false;
+        _processDir = null;
+    }
+
+    private static string? FindLogInDir(string logsDir)
+    {
+        if (!Directory.Exists(logsDir)) return null;
+
+        var candidates = new List<(DateTime mtime, string path)>();
+
+        foreach (var folder in Directory.GetDirectories(logsDir, "Hearthstone_*"))
+        {
+            var p = Path.Combine(folder, "Power.log");
+            if (File.Exists(p))
+                candidates.Add((File.GetLastWriteTimeUtc(p), p));
+        }
+
+        var rootLog = Path.Combine(logsDir, "Power.log");
+        if (File.Exists(rootLog))
+            candidates.Add((File.GetLastWriteTimeUtc(rootLog), rootLog));
+
+        if (candidates.Count == 0) return null;
+        return candidates.OrderByDescending(c => c.mtime).First().path;
+    }
+}
+}

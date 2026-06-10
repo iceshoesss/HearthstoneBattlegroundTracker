@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <PlatformTarget>x86</PlatformTarget>
+    <UseWPF>true</UseWPF>
+    <LangVersion>10</LangVersion>
+    <NoWarn>CS8632;CS0649</NoWarn>
+    <RootNamespace>HearthstoneBattlegroundTracker</RootNamespace>
+    <AssemblyName>HearthstoneBattlegroundTracker</AssemblyName>
+    <Version>0.3.0</Version>
+    <Description>HearthstoneBattlegroundTracker</Description>
+    <ApplicationIcon>..\LeagueTool\icon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <DefaultItemExcludes>$(DefaultItemExcludes);BattlegroundSpy\**;BattlegroundSpy.Test\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <!-- Release 不生成 .pdb -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <!-- Project references -->
+  <ItemGroup>
+    <ProjectReference Include="BattlegroundSpy\BattlegroundSpy.csproj" />
+    <ProjectReference Include="Plugins\HdtCompat\HdtCompat.csproj" />
+    <ProjectReference Include="Plugins\BobsBuddyCompat\BobsBuddyCompat.csproj" />
+  </ItemGroup>
+
+  <!-- NuGet packages -->
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="WindowsFirewallHelper" Version="2.1.4.81" />
+  </ItemGroup>
+
+  <!-- Assembly references -->
+  <ItemGroup>
+    <Reference Include="BattlegroundDB">
+      <HintPath>Lib\BattlegroundDB.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Net.Http" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <!-- Icon -->
+  <ItemGroup>
+    <Content Include="..\LeagueTool\icon.ico" CopyToOutputDirectory="PreserveNewest" Link="icon.ico" />
+  </ItemGroup>
+
+  <!-- Tribe icons -->
+  <ItemGroup>
+    <Resource Include="Resources\TribeIcons\*.jpg" />
+  </ItemGroup>
+
+  <!-- Minion overlays -->
+  <ItemGroup>
+    <Resource Include="Resources\Minion\*.png" />
+  </ItemGroup>
+
+  <!-- Fonts -->
+  <ItemGroup>
+    <Resource Include="Resources\*.otf" />
+  </ItemGroup>
+
+</Project>

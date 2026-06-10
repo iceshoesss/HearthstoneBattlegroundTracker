@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "dgSpecHash": "EY50VN1lcvs=",
+  "success": true,
+  "projectFilePath": "D:\\coding\\HDT_BGTracker\\HearthstoneBattlegroundTracker\\HearthstoneBattlegroundTracker.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\cc\\.nuget\\packages\\jetbrains.annotations\\2024.2.0\\jetbrains.annotations.2024.2.0.nupkg.sha512",
+    "C:\\Users\\cc\\.nuget\\packages\\newtonsoft.json\\13.0.3\\newtonsoft.json.13.0.3.nupkg.sha512",
+    "C:\\Users\\cc\\.nuget\\packages\\system.valuetuple\\4.5.0\\system.valuetuple.4.5.0.nupkg.sha512",
+    "C:\\Users\\cc\\.nuget\\packages\\windowsfirewallhelper\\2.1.4.81\\windowsfirewallhelper.2.1.4.81.nupkg.sha512"
+  ],
+  "logs": []
+}

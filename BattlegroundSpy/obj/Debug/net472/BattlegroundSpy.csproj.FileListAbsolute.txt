@@ -1,0 +1,12 @@
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\BattlegroundSpy\bin\Debug\net472\BattlegroundSpy.dll
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\BattlegroundSpy\bin\Debug\net472\BattlegroundSpy.pdb
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\BattlegroundSpy\bin\Debug\net472\JetBrains.Annotations.dll
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\BattlegroundSpy\bin\Debug\net472\Newtonsoft.Json.dll
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\BattlegroundSpy\bin\Debug\net472\System.ValueTuple.dll
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\BattlegroundSpy\obj\Debug\net472\BattlegroundSpy.csproj.AssemblyReference.cache
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\BattlegroundSpy\obj\Debug\net472\BattlegroundSpy.GeneratedMSBuildEditorConfig.editorconfig
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\BattlegroundSpy\obj\Debug\net472\BattlegroundSpy.csproj.CoreCompileInputs.cache
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\BattlegroundSpy\obj\Debug\net472\BattlegroundSpy.sourcelink.json
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\BattlegroundSpy\obj\Debug\net472\Battlegr.1C55A5D5.Up2Date
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\BattlegroundSpy\obj\Debug\net472\BattlegroundSpy.dll
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\BattlegroundSpy\obj\Debug\net472\BattlegroundSpy.pdb

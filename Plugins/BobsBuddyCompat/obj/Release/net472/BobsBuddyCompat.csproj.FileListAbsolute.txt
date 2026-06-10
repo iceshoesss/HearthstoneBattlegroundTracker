@@ -1,0 +1,8 @@
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\Plugins\BobsBuddyCompat\bin\Release\net472\BobsBuddy.dll
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\Plugins\BobsBuddyCompat\bin\Release\net472\BobsBuddy.pdb
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\Plugins\BobsBuddyCompat\obj\Release\net472\BobsBuddyCompat.csproj.AssemblyReference.cache
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\Plugins\BobsBuddyCompat\obj\Release\net472\BobsBuddyCompat.GeneratedMSBuildEditorConfig.editorconfig
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\Plugins\BobsBuddyCompat\obj\Release\net472\BobsBuddyCompat.csproj.CoreCompileInputs.cache
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\Plugins\BobsBuddyCompat\obj\Release\net472\BobsBuddyCompat.sourcelink.json
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\Plugins\BobsBuddyCompat\obj\Release\net472\BobsBuddy.dll
+D:\coding\HDT_BGTracker\HearthstoneBattlegroundTracker\Plugins\BobsBuddyCompat\obj\Release\net472\BobsBuddy.pdb
