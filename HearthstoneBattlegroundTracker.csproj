@@ -15,7 +15,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
-    <DefaultItemExcludes>$(DefaultItemExcludes);BattlegroundSpy\**;BattlegroundSpy.Test\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);BattlegroundSpy\**;BattlegroundSpy.Test\**;HBTCombat\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <!-- Release 不生成 .pdb -->
@@ -41,6 +41,10 @@
   <ItemGroup>
     <Reference Include="BattlegroundDB">
       <HintPath>Lib\BattlegroundDB.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="HBTCombat">
+      <HintPath>Lib\HBTCombat.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Net.Http" />

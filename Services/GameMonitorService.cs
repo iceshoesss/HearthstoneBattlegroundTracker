@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using BattlegroundSpy.Objects;
 using HBT.Models;
 using HBT.Plugins;
-using HBT.Services.Combat;
+using HBTCombat;
 
 namespace HBT.Services
 {
