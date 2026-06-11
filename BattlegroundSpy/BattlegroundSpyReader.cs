@@ -684,7 +684,8 @@ public sealed class BattlegroundSpyReader : IDisposable
     /// <summary>
     /// 获取鼠标悬停的排行榜玩家的 PLAYER_ID。
     /// 优先直接从 tile.m_playerId 读取（唯一、不受畸变影响），
-    /// fallback 到 entity tag 2 (PLAYER_ID)，最后才用 heroCardId 查找。
+    /// fallback 到 entity tag 2，再 fallback 到排行榜 m_playerId 匹配，
+    /// 最后才用 heroCardId 在 m_entityMap 中查找。
     /// </summary>
     public int GetLeaderboardHoveredPlayerId()
     {
@@ -696,7 +697,7 @@ public sealed class BattlegroundSpyReader : IDisposable
             dynamic tile = leaderboard["m_currentlyMousedOverTile"];
             if (tile == null) return 0;
 
-            // 优先直接从 tile 读取 m_playerId（排行榜条目自带，唯一且稳定）
+            // 尝试直接读取 tile.m_playerId（游戏版本可能已移除此字段）
             try
             {
                 int directPlayerId = (int)tile["m_playerId"];
@@ -707,16 +708,26 @@ public sealed class BattlegroundSpyReader : IDisposable
             dynamic entity = tile["m_entity"];
             if (entity == null) return 0;
 
-            // fallback: 从 entity 的 tags 读取 PLAYER_ID
+            // 从 entity tags 读取 PLAYER_ID
             var tags = ReadTagDict(entity["m_tags"]?["m_values"]);
-            int playerId = GetTagValue(tags, 2); // PLAYER_ID
+            int playerId = GetTagValue(tags, 2);
             if (playerId != 0) return playerId;
 
-            // 最后 fallback: 用 hero card ID 查找（畸变时可能不准）
+            // 用 heroCardId 在排行榜条目中查找
             string heroCardId = null;
             try { heroCardId = (string)entity["m_cardIdInternal"]; } catch { }
-            if (string.IsNullOrEmpty(heroCardId)) return 0;
+            if (!string.IsNullOrEmpty(heroCardId))
+            {
+                var rankings = GetPlayerRankings();
+                foreach (var r in rankings)
+                {
+                    if (string.Equals(r.heroCardId, heroCardId, StringComparison.OrdinalIgnoreCase) && r.playerId != 0)
+                        return r.playerId;
+                }
+            }
 
+            // 最后 fallback: m_entityMap 查找
+            if (string.IsNullOrEmpty(heroCardId)) return 0;
             return GetPlayerIdByHeroCardId(heroCardId);
         }
         catch
@@ -983,12 +994,14 @@ public sealed class BattlegroundSpyReader : IDisposable
                 int zonePos = (int)(card["m_zonePosition"] ?? 0);
                 int cardType = GetTagValue(tags, 202); // CARDTYPE: 3=HERO, 4=MINION
 
+                int zone = GetTagValue(tags, 49); // ZONE: 1=PLAY, 2=DECK, 4=GRAVEYARD
+
                 // 识别对手英雄 (CARDTYPE = 3)
                 if (cardType == 3 && string.IsNullOrEmpty(result.HeroCardId))
                 {
                     result.HeroCardId = cardId;
                 }
-                else if (cardType == 4) // MINION
+                else if (cardType == 4 && zone == 1) // MINION + ZONE_PLAY
                 {
                     result.BoardCards.Add(new BoardCard
                     {

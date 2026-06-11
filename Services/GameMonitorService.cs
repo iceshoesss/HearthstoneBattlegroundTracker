@@ -304,13 +304,33 @@ public class GameMonitorService : IDisposable
                                     if (mode == "BG")
                                     {
                                         _currentGame.IsActive = true;
+
+                                        // 中途启动：从上一局结束标记开始读取，填充 EntityTracker
+                                        var startOffset = watcher.FindGameStartOffset();
+                                        watcher.SetPosition(startOffset);
+                                        Log($"中途启动 BG，从位置 {startOffset} 读取填充 EntityTracker...");
+                                        var initialLines = watcher.TryReadLines();
+                                        if (initialLines != null && initialLines.Length > 0)
+                                        {
+                                            foreach (var line in initialLines)
+                                            {
+                                                if (!line.Contains("GameState.") && !line.Contains("PowerTaskList."))
+                                                    continue;
+                                                // 只让 Parser 填充 EntityTracker，不触发游戏事件
+                                                var (_, newState, newGame) = Parser.ProcessLine(line, _currentGame, _gameState, _games, _entityTracker);
+                                                _gameState = newState;
+                                                _currentGame = newGame;
+                                            }
+                                            Log($"EntityTracker: {_entityTracker.Entities.Count} 个实体");
+                                        }
+
                                         HandleCheckLeague();
                                     }
                                     else
                                     {
                                         Log($"场景4但非战棋模式({mode ?? "未知"})，跳过");
                                     }
-                                    // 非 15→4 场景，跳到末尾避免重复处理
+                                    // 跳到末尾避免重复处理
                                     watcher.SetPosition(new FileInfo(logPath).Length);
                                 }
                             }
@@ -673,10 +693,20 @@ public class GameMonitorService : IDisposable
 
                 var heroCardId = _hm.GetLeaderboardHoveredHeroCardId();
 
-                // 优先从 tile 直接读取 PLAYER_ID（唯一、不受畸变影响）
+                // 优先从 tile 直接读取 PLAYER_ID
                 int playerId = _hm.GetLeaderboardHoveredPlayerId();
 
-                // fallback: 从 EntityTracker 获取（非畸变时）
+                // fallback: 通过 entity ID 在 EntityTracker 中查找（对齐 HDT 方案）
+                if (playerId == 0)
+                {
+                    int entityId = _hm.GetLeaderboardHoveredEntityId();
+                    if (entityId > 0 && _entityTracker.Entities.TryGetValue(entityId, out var entity))
+                    {
+                        playerId = entity.GetTag(2); // PLAYER_ID
+                    }
+                }
+
+                // fallback: 通过 heroCardId 在 EntityTracker 中查找
                 if (playerId == 0 && !string.IsNullOrEmpty(heroCardId))
                 {
                     var localController = _hm.GetLocalControllerIdPublic();
@@ -712,16 +742,14 @@ public class GameMonitorService : IDisposable
                         if (playerId > 0 && _opponentBoardCache.TryGetValue(playerId, out var cached))
                         {
                             record = cached;
-                            Log($"[Debug] 悬停查找: playerId={playerId} ({heroCardId}) 命中缓存, 回合{record.CapturedTurn}, {record.BoardState.Count}个随从");
                         }
                         else if (_lastCapturedRecord != null && _lastCapturedRecord.PlayerId == playerId && playerId > 0)
                         {
                             record = _lastCapturedRecord;
-                            Log($"[Debug] 悬停查找: playerId={playerId} 命中_lastCaptured, 回合{record.CapturedTurn}, {record.BoardState.Count}个随从");
                         }
                         else
                         {
-                            Log($"[Debug] 悬停查找: playerId={playerId} ({heroCardId}) 未命中, 缓存大小={_opponentBoardCache.Count}, 缓存keys=[{string.Join(",", _opponentBoardCache.Keys)}]");
+                            Log($"悬停未命中: playerId={playerId} ({heroCardId})");
                         }
 
                         // 查找对手 Lo（用于胜率查询）
@@ -788,13 +816,9 @@ public class GameMonitorService : IDisposable
             var localController = _hm.GetLocalControllerIdPublic();
             if (localController == null)
             {
-                Log("[Debug] 无法获取本地玩家 Controller ID");
                 return;
             }
-            Log($"[Debug] 本地 ControllerId={localController.Value}");
-
             var opponentMinions = _entityTracker.GetOpponentMinions(localController.Value);
-            Log($"[Debug] EntityTracker 返回对手随从: {opponentMinions.Count}个");
 
             // 用 BGSpy 获取对手英雄 cardId
             var boardState = _hm.GetOpponentBoardState();
@@ -816,7 +840,7 @@ public class GameMonitorService : IDisposable
                 }
             }
 
-            Log($"[Debug] 英雄: {heroCardId}, playerId={playerId}");
+            Log($"英雄: {heroCardId}, playerId={playerId}");
 
             // 转换为字典格式（即使为空也要保存，表示遇到过该对手）
             var boardDicts = new List<Dictionary<string, object>>();
@@ -858,14 +882,14 @@ public class GameMonitorService : IDisposable
             if (playerId > 0)
             {
                 if (_opponentBoardCache.TryGetValue(playerId, out var old))
-                    Log($"[Debug] 覆盖缓存: playerId={playerId} ({heroCardId}) 旧回合{old.CapturedTurn}→新回合{actualTurn}");
+                    Log($"覆盖缓存: playerId={playerId} ({heroCardId}) 旧回合{old.CapturedTurn}→新回合{actualTurn}");
 
                 _opponentBoardCache[playerId] = record;
                 Log($"战斗开始捕获: playerId={playerId} ({heroCardId}), {boardDicts.Count}个随从, 回合{actualTurn}");
             }
             else
             {
-                Log($"[Debug] PlayerId=0, 跳过缓存存储 ({heroCardId})");
+                Log($"PlayerId=0, 跳过缓存存储 ({heroCardId})");
             }
 
             // 捕获完成后，清除对手随从残留（防止下次战斗累积）

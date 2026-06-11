@@ -12,7 +12,7 @@ namespace HBT
 /// </summary>
 public class LogWatcher
 {
-    private const long InitialReadBytes = 5 * 1024 * 1024; // 首次读取 5MB
+    private const long InitialReadBytes = 20 * 1024 * 1024; // 首次读取 20MB（游戏时间长时需要更多）
 
     string _currentPath;
     long _pos;
@@ -114,6 +114,64 @@ public class LogWatcher
         catch
         {
             return null;
+        }
+    }
+
+    /// <summary>
+    /// 从文件末尾向前扫描，找到上一局结束标记（tag=STATE value=COMPLETE）的字节偏移量。
+    /// 用于中途启动时从当前局开头开始读取。
+    /// 如果找不到标记（第一局），返回 0（从头读取）。
+    /// </summary>
+    public long FindGameStartOffset()
+    {
+        try
+        {
+            var fileLen = new FileInfo(_currentPath).Length;
+            if (fileLen == 0) return 0;
+
+            const string endMarker = "tag=STATE value=COMPLETE";
+            const int chunkSize = 64 * 1024; // 64KB chunks
+
+            using (var fs = new FileStream(_currentPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                long searchPos = fileLen;
+                string remainder = "";
+
+                while (searchPos > 0)
+                {
+                    long readStart = Math.Max(0, searchPos - chunkSize);
+                    int readLen = (int)(searchPos - readStart);
+
+                    fs.Seek(readStart, SeekOrigin.Begin);
+                    var buffer = new byte[readLen];
+                    fs.Read(buffer, 0, readLen);
+
+                    var text = System.Text.Encoding.UTF8.GetString(buffer) + remainder;
+                    var idx = text.LastIndexOf(endMarker, StringComparison.Ordinal);
+
+                    if (idx >= 0)
+                    {
+                        // 找到标记，返回标记所在行的起始位置
+                        var beforeMarker = text.Substring(0, idx);
+                        var lastNewline = beforeMarker.LastIndexOf('\n');
+                        var offset = readStart + (lastNewline >= 0 ? lastNewline + 1 : 0);
+                        Console.WriteLine($"[日志] 找到上一局结束标记，从位置 {offset:N0}/{fileLen:N0} 开始读取");
+                        return offset;
+                    }
+
+                    remainder = text.Substring(0, Math.Min(text.Length, endMarker.Length));
+                    searchPos = readStart;
+                }
+            }
+
+            // 没找到标记（第一局），从头读取
+            Console.WriteLine($"[日志] 未找到上一局结束标记，从头读取");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[日志] 查找结束标记失败: {ex.Message}，从头读取");
+            return 0;
         }
     }
 
