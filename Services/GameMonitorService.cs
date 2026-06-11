@@ -938,6 +938,8 @@ public class GameMonitorService : IDisposable
                 sim.Venomous = m.Venomous;
                 sim.Windfury = m.Windfury;
                 sim.Reborn = m.Reborn;
+                sim.Golden = m.Golden;
+                sim.Cleave = IsCleaveMinion(m.CardId);
                 // TODO: 亡语回调（后续实现）
                 input.PlayerBoard.Add(sim);
             }
@@ -952,6 +954,8 @@ public class GameMonitorService : IDisposable
                 sim.Venomous = m.Venomous;
                 sim.Windfury = m.Windfury;
                 sim.Reborn = m.Reborn;
+                sim.Golden = m.Golden;
+                sim.Cleave = IsCleaveMinion(m.CardId);
                 input.OpponentBoard.Add(sim);
             }
 
@@ -960,7 +964,7 @@ public class GameMonitorService : IDisposable
             // 后台运行模拟
             Task.Run(() =>
             {
-                var result = SimulationRunner.Run(input, iterations: 500, maxMs: 300);
+                var result = SimulationRunner.Run(input, iterations: 2000, maxMs: 500);
                 Log($"[模拟] 完成: 胜{result.WinRate * 100:F0}% 平{result.TieRate * 100:F0}% 负{result.LossRate * 100:F0}% 我方{result.PlayerDamageMin}~{result.PlayerDamageMax} 对方{result.OpponentDamageMin}~{result.OpponentDamageMax}");
                 OnCombatSimulationResult?.Invoke(
                     result.WinRate, result.TieRate, result.LossRate,
@@ -973,6 +977,17 @@ public class GameMonitorService : IDisposable
             Log($"[模拟] 异常: {ex.Message}");
         }
     }
+
+    /// <summary>已知顺劈随从 CardId 列表</summary>
+    private static readonly HashSet<string> CleaveMinions = new HashSet<string>
+    {
+        "BOT_559",      // 洞穴九头蛇 Cave Hydra
+        "BG22_002",     // 急速潜行者 Frenzied Lefthander
+        "BG26_127",     // 潮汐女皇 Tidal Empress
+        "LOE_073",      // 迪恩巴拉瑟布甲虫 Djinn-Bound Scarab
+    };
+
+    private static bool IsCleaveMinion(string cardId) => CleaveMinions.Contains(cardId);
 
     /// <summary>
     /// BG 阵容快照：tag 3533 1→0 时触发（对齐 HDT SnapshotCurrentBoard）。

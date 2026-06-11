@@ -219,7 +219,7 @@ public class CombatSimulator
 
     private int CalculateDamage(List<SimMinion> survivingMinions, int tier, int damageCap)
     {
-        int stars = survivingMinions.Sum(m => m.Tier);
+        int stars = survivingMinions.Sum(m => m.Golden ? m.Tier * 2 : m.Tier);
         int damage = stars + tier;
         if (damageCap > 0 && damage > damageCap)
             damage = damageCap;

@@ -25,6 +25,7 @@ public struct SimMinion
     public bool Reborn;
     public bool Stealth;
     public bool HasAttacked;
+    public bool Golden;
 
     // 亡语回调
     public Func<SimMinion, SimMinion[]>? Deathrattle;
@@ -65,6 +66,7 @@ public struct SimMinion
             Reborn = Reborn,
             Stealth = Stealth,
             HasAttacked = HasAttacked,
+            Golden = Golden,
             Deathrattle = Deathrattle,
         };
     }
