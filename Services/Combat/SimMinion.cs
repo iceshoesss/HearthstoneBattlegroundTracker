@@ -24,6 +24,7 @@ public struct SimMinion
     public bool Cleave;
     public bool Reborn;
     public bool Stealth;
+    public bool HasAttacked; // 每轮攻击后标记，一轮结束后重置
 
     // 亡语回调：参数是自身，返回召唤列表（null 表示无亡语）
     public Func<SimMinion, SimMinion[]>? Deathrattle;
@@ -63,6 +64,7 @@ public struct SimMinion
             Cleave = Cleave,
             Reborn = Reborn,
             Stealth = Stealth,
+            HasAttacked = HasAttacked,
             Deathrattle = Deathrattle,
         };
     }

@@ -917,14 +917,15 @@ public class GameMonitorService : IDisposable
             Log($"[模拟] 己方随从={playerMinions.Count}");
 
             // 构建输入（允许一方为空）
+            int playerTier = playerMinions.Count > 0 ? playerMinions.Max(m => m.TechLevel) : 6;
             var input = new SimulationInput
             {
-                PlayerHealth = _lastKnownMmr > 0 ? 40 : 40, // 简化：默认 40 血
+                PlayerHealth = _lastKnownMmr > 0 ? 40 : 40,
                 OpponentHealth = 40,
-                PlayerTier = 6, // 简化：默认满级
-                OpponentTier = 6,
+                PlayerTier = playerTier,
+                OpponentTier = 6, // 排行榜对手通常是高本
                 Turn = GetActualTurn(_lastRawTurn),
-                DamageCap = _hm.GetDamageCap(), // 从内存读取伤害上限
+                DamageCap = _hm.GetDamageCap(),
             };
 
             // 转换己方随从

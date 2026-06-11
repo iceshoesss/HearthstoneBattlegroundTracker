@@ -7,11 +7,11 @@ namespace HBT.Services.Combat
 
 /// <summary>
 /// 核心战斗模拟器
-/// 设计参考 twanvl 方案：flat struct + 函数指针，无嵌套 Scope
+/// 参考 BobsBuddy (HDT) 和 Firestone 的攻击逻辑
 /// </summary>
 public class CombatSimulator
 {
-    private static readonly Random _rng = new Random();
+    private readonly Random _rng = new Random();
 
     /// <summary>
     /// 模拟一次战斗，返回伤害值（正=己方赢，负=对方赢，0=平局）
@@ -21,61 +21,37 @@ public class CombatSimulator
         var playerBoard = CloneBoard(input.PlayerBoard);
         var opponentBoard = CloneBoard(input.OpponentBoard);
 
-        bool playerTurn = _rng.Next(2) == 0; // 随机决定先手
+        bool playerTurn = _rng.Next(2) == 0;
 
         for (int round = 0; round < 500; round++)
         {
-            // 检查胜负
             if (playerBoard.Count == 0 && opponentBoard.Count == 0)
-                return 0; // 平局
+                return 0;
             if (playerBoard.Count == 0)
                 return -CalculateDamage(opponentBoard, input.OpponentTier, input.DamageCap);
             if (opponentBoard.Count == 0)
                 return CalculateDamage(playerBoard, input.PlayerTier, input.DamageCap);
 
-            // 选攻击方
             var attackerSide = playerTurn ? playerBoard : opponentBoard;
             var defenderSide = playerTurn ? opponentBoard : playerBoard;
 
-            var attacker = ChooseAttacker(attackerSide);
-            if (attacker == null) break;
+            // 左到右选攻击方
+            int attackerIdx = ChooseAttacker(attackerSide);
+            if (attackerIdx < 0) break;
 
             // 选目标
-            var target = ChooseTarget(defenderSide);
-            if (target == null) break;
+            int targetIdx = ChooseTarget(defenderSide);
+            if (targetIdx < 0) break;
 
-            // 执行攻击
-            PerformAttack(attacker.Value, target.Value, attackerSide, defenderSide);
-
-            // 清理死亡随从 + 触发亡语
-            ResolveDeaths(attackerSide);
-            ResolveDeaths(defenderSide);
-
-            // 风怒处理
-            if (attacker.Value.IsAlive && (attacker.Value.Windfury || attacker.Value.MegaWindfury))
-            {
-                int extraAttacks = attacker.Value.MegaWindfury ? 3 : 1;
-                for (int i = 0; i < extraAttacks; i++)
-                {
-                    if (defenderSide.Count == 0) break;
-                    target = ChooseTarget(defenderSide);
-                    if (target == null) break;
-
-                    var a = FindMinion(attackerSide, attacker.Value.CardId);
-                    if (a == null) break;
-
-                    PerformAttack(a.Value, target.Value, attackerSide, defenderSide);
-                    ResolveDeaths(attackerSide);
-                    ResolveDeaths(defenderSide);
-                }
-            }
+            // 执行攻击（含风怒多段攻击）
+            ExecuteAttack(attackerSide, attackerIdx, defenderSide, targetIdx);
 
             playerTurn = !playerTurn;
         }
 
-        // 500 回合未分胜负 → 按存活随从 star sum 判断
-        int playerStars = playerBoard.Sum(m => m.BaseAttack + m.BaseHealth);
-        int opponentStars = opponentBoard.Sum(m => m.BaseAttack + m.BaseHealth);
+        // 500 回合未分胜负
+        int playerStars = playerBoard.Sum(m => m.Tier);
+        int opponentStars = opponentBoard.Sum(m => m.Tier);
         if (playerStars > opponentStars)
             return CalculateDamage(playerBoard, input.PlayerTier, input.DamageCap);
         if (opponentStars > playerStars)
@@ -83,103 +59,191 @@ public class CombatSimulator
         return 0;
     }
 
-    // ── 攻击者选择 ──
+    // ── 攻击方选择：左到右第一个未攻击的 ──
 
-    private SimMinion? ChooseAttacker(List<SimMinion> side)
+    private int ChooseAttacker(List<SimMinion> side)
     {
-        // 嘲讽优先？不，攻击者是自己选的，从左到右第一个未攻击的
-        // 简化：随机选一个可攻击的
-        var valid = side.Where(m => m.IsAlive && m.Attack > 0).ToList();
-        if (valid.Count == 0) return null;
-        return valid[_rng.Next(valid.Count)];
+        // 左到右找第一个未攻击的有效攻击者
+        for (int i = 0; i < side.Count; i++)
+        {
+            if (side[i].IsAlive && !side[i].HasAttacked && side[i].Attack > 0)
+                return i;
+        }
+
+        // 所有随从都攻击过了 → 重置标记
+        for (int i = 0; i < side.Count; i++)
+        {
+            var m = side[i];
+            m.HasAttacked = false;
+            side[i] = m;
+        }
+
+        // 重新从左开始
+        for (int i = 0; i < side.Count; i++)
+        {
+            if (side[i].IsAlive && side[i].Attack > 0)
+                return i;
+        }
+
+        return -1;
     }
 
-    // ── 目标选择 ──
+    // ── 目标选择：嘲讽优先（随机），无嘲讽则随机；排除隐身 ──
 
-    private SimMinion? ChooseTarget(List<SimMinion> side)
+    private int ChooseTarget(List<SimMinion> side)
     {
-        var alive = side.Where(m => m.IsAlive).ToList();
-        if (alive.Count == 0) return null;
+        var candidates = new List<int>();
+        for (int i = 0; i < side.Count; i++)
+        {
+            if (side[i].IsAlive && !side[i].Stealth)
+                candidates.Add(i);
+        }
 
-        // 嘲讽优先
-        var taunts = alive.Where(m => m.Taunt).ToList();
+        if (candidates.Count == 0) return -1;
+
+        // 嘲讽优先（随机选一个嘲讽）
+        var taunts = candidates.Where(i => side[i].Taunt).ToList();
         if (taunts.Count > 0)
             return taunts[_rng.Next(taunts.Count)];
 
-        return alive[_rng.Next(alive.Count)];
+        // 随机选
+        return candidates[_rng.Next(candidates.Count)];
     }
 
-    // ── 执行攻击 ──
+    // ── 执行攻击（含风怒、顺劈、毒、反击）──
 
-    private void PerformAttack(SimMinion attacker, SimMinion target,
-        List<SimMinion> attackerSide, List<SimMinion> defenderSide)
+    private void ExecuteAttack(List<SimMinion> attackerSide, int attackerIdx,
+        List<SimMinion> defenderSide, int targetIdx)
     {
+        var attacker = attackerSide[attackerIdx];
+        int maxAttacks = attacker.MegaWindfury ? 4 : (attacker.Windfury ? 2 : 1);
+
+        for (int atk = 0; atk < maxAttacks; atk++)
+        {
+            if (defenderSide.Count == 0) break;
+
+            // 重新选目标（风怒每次攻击重新选）
+            int curTarget = ChooseTarget(defenderSide);
+            if (curTarget < 0) break;
+
+            // 重新定位攻击者（可能因死亡变化）
+            int curAttacker = FindAliveIndex(attackerSide, attacker);
+            if (curAttacker < 0) break;
+
+            // 执行单次攻击
+            PerformSingleAttack(attackerSide, curAttacker, defenderSide, curTarget);
+
+            // 解析死亡
+            ResolveAllDeaths(attackerSide, defenderSide);
+
+            // 隐身随从攻击后移除隐身
+            curAttacker = FindAliveIndex(attackerSide, attacker);
+            if (curAttacker >= 0)
+            {
+                var m = attackerSide[curAttacker];
+                if (m.Stealth)
+                {
+                    m.Stealth = false;
+                    attackerSide[curAttacker] = m;
+                }
+            }
+        }
+
+        // 标记攻击完成
+        attackerIdx = FindAliveIndex(attackerSide, attacker);
+        if (attackerIdx >= 0)
+        {
+            var m = attackerSide[attackerIdx];
+            m.HasAttacked = true;
+            attackerSide[attackerIdx] = m;
+        }
+    }
+
+    // ── 单次攻击 ──
+
+    private void PerformSingleAttack(List<SimMinion> attackerSide, int attackerIdx,
+        List<SimMinion> defenderSide, int targetIdx)
+    {
+        var attacker = attackerSide[attackerIdx];
+        var target = defenderSide[targetIdx];
+
         // 攻击者对目标造成伤害
         target.TakeDamage(attacker.Attack);
 
-        // 目标反击（除非攻击者免疫）
+        // 目标反击
         if (target.IsAlive)
         {
             attacker.TakeDamage(target.Attack);
         }
 
-        // 毒/烈毒：直接击杀
-        if (attacker.IsAlive && target.IsAlive)
+        // 毒/烈毒
+        if (attacker.IsAlive && attacker.Attack > 0)
         {
             if (attacker.Poisonous || attacker.Venomous)
                 target.CurrentHealth = 0;
+        }
+        if (target.IsAlive && target.Attack > 0)
+        {
             if (target.Poisonous || target.Venomous)
                 attacker.CurrentHealth = 0;
         }
 
-        // 顺劈：对相邻随从造成等量伤害
+        // 顺劈
         if (attacker.IsAlive && attacker.Cleave)
         {
-            var targetIdx = defenderSide.IndexOf(target);
             if (targetIdx > 0)
                 defenderSide[targetIdx - 1].TakeDamage(attacker.Attack);
             if (targetIdx < defenderSide.Count - 1)
                 defenderSide[targetIdx + 1].TakeDamage(attacker.Attack);
         }
+
+        // 写回攻击者
+        attackerSide[attackerIdx] = attacker;
     }
 
-    // ── 死亡处理 + 亡语 ──
+    // ── 死亡处理（双方同时结算）──
 
-    private void ResolveDeaths(List<SimMinion> side)
+    private void ResolveAllDeaths(List<SimMinion> side1, List<SimMinion> side2)
     {
-        // 找出死亡随从
-        var dead = side.Where(m => !m.IsAlive).ToList();
-        if (dead.Count == 0) return;
+        var dead1 = side1.Where(m => !m.IsAlive).ToList();
+        var dead2 = side2.Where(m => !m.IsAlive).ToList();
 
-        // 移除死亡随从
-        foreach (var d in dead)
-            side.Remove(d);
+        foreach (var d in dead1) side1.Remove(d);
+        foreach (var d in dead2) side2.Remove(d);
 
-        // 触发亡语
-        foreach (var d in dead)
+        foreach (var d in dead1) TriggerDeathrattle(d, side1);
+        foreach (var d in dead2) TriggerDeathrattle(d, side2);
+
+        foreach (var d in dead1) TriggerReborn(d, side1);
+        foreach (var d in dead2) TriggerReborn(d, side2);
+    }
+
+    private void TriggerDeathrattle(SimMinion dead, List<SimMinion> side)
+    {
+        if (dead.Deathrattle != null)
         {
-            if (d.Deathrattle != null)
+            var summons = dead.Deathrattle(dead);
+            if (summons != null)
             {
-                var summons = d.Deathrattle(d);
-                if (summons != null)
+                foreach (var s in summons)
                 {
-                    foreach (var s in summons)
-                    {
-                        if (side.Count < 7) // 最多 7 个随从
-                            side.Add(s);
-                    }
+                    if (side.Count < 7)
+                        side.Add(s);
                 }
             }
+        }
+    }
 
-            // 复生：重新召唤（1 血）
-            if (d.Reborn)
-            {
-                var reborn = d.Clone();
-                reborn.CurrentHealth = 1;
-                reborn.Reborn = false; // 复生只触发一次
-                if (side.Count < 7)
-                    side.Add(reborn);
-            }
+    private void TriggerReborn(SimMinion dead, List<SimMinion> side)
+    {
+        if (dead.Reborn)
+        {
+            var reborn = dead.Clone();
+            reborn.CurrentHealth = 1;
+            reborn.Reborn = false;
+            reborn.DivineShield = dead.DivineShield; // Reborn 恢复圣盾
+            if (side.Count < 7)
+                side.Add(reborn);
         }
     }
 
@@ -189,11 +253,8 @@ public class CombatSimulator
     {
         int stars = survivingMinions.Sum(m => m.Tier);
         int damage = stars + tier;
-
-        // 伤害上限（从游戏 tag 读取）
         if (damageCap > 0 && damage > damageCap)
             damage = damageCap;
-
         return damage;
     }
 
@@ -204,14 +265,21 @@ public class CombatSimulator
         return board.Select(m => m.Clone()).ToList();
     }
 
-    private SimMinion? FindMinion(List<SimMinion> side, string cardId)
+    private int FindAliveIndex(List<SimMinion> side, SimMinion reference)
     {
+        // 先用 CardId 找同名存活随从
         for (int i = 0; i < side.Count; i++)
         {
-            if (side[i].CardId == cardId && side[i].IsAlive)
-                return side[i];
+            if (side[i].IsAlive && side[i].CardId == reference.CardId && !side[i].HasAttacked)
+                return i;
         }
-        return null;
+        // fallback: 找任意同名存活随从
+        for (int i = 0; i < side.Count; i++)
+        {
+            if (side[i].IsAlive && side[i].CardId == reference.CardId)
+                return i;
+        }
+        return -1;
     }
 }
 

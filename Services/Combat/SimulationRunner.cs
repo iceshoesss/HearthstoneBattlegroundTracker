@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace HBT.Services.Combat
 {
@@ -35,19 +36,28 @@ public class SimulationRunner
     /// <summary>
     /// 运行 N 次模拟，返回聚合结果
     /// </summary>
-    public static SimulationResult Run(SimulationInput input, int iterations = 1000, int maxMs = 500)
+    public static SimulationResult Run(SimulationInput input, int iterations = 2000, int maxMs = 500)
     {
         var sw = Stopwatch.StartNew();
         var results = new List<int>();
-        var simulator = new CombatSimulator();
 
-        for (int i = 0; i < iterations; i++)
+        // 多线程模拟（参考 BobsBuddy: ProcessorCount/2 线程）
+        int threadCount = Math.Max(1, Environment.ProcessorCount / 2);
+        int perThread = iterations / threadCount;
+        var bag = new System.Collections.Concurrent.ConcurrentBag<int>();
+
+        Parallel.For(0, threadCount, _ =>
         {
-            results.Add(simulator.SimulateFight(input));
-            if (sw.ElapsedMilliseconds > maxMs)
-                break;
-        }
+            var sim = new CombatSimulator();
+            int count = 0;
+            while (count < perThread && sw.ElapsedMilliseconds < maxMs)
+            {
+                bag.Add(sim.SimulateFight(input));
+                count++;
+            }
+        });
 
+        results.AddRange(bag);
         return Aggregate(results);
     }
 
