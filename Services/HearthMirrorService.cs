@@ -193,6 +193,13 @@ public class HearthMirrorService : IDisposable
         catch (Exception ex) { Console.WriteLine($"[HM] GetLeaderboardHoveredPlayerId failed: {ex.Message}"); return 0; }
     }
 
+    /// <summary>Get opponent's PLAYER_ID directly from ZONE_PLAY hero entity</summary>
+    public int GetOpponentPlayerIdInPlay()
+    {
+        try { return GetSpy().GetOpponentPlayerIdInPlay(); }
+        catch (Exception ex) { Console.WriteLine($"[HM] GetOpponentPlayerIdInPlay failed: {ex.Message}"); return 0; }
+    }
+
     /// <summary>Get opponent hero's EntityId from m_entityMap</summary>
     public int GetOpponentEntityId()
     {

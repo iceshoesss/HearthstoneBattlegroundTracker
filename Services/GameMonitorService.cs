@@ -673,9 +673,11 @@ public class GameMonitorService : IDisposable
 
                 var heroCardId = _hm.GetLeaderboardHoveredHeroCardId();
 
-                // 从 EntityTracker 获取悬停英雄的 PLAYER_ID（Power.log 数据，最可靠）
-                int playerId = 0;
-                if (!string.IsNullOrEmpty(heroCardId))
+                // 优先从 tile 直接读取 PLAYER_ID（唯一、不受畸变影响）
+                int playerId = _hm.GetLeaderboardHoveredPlayerId();
+
+                // fallback: 从 EntityTracker 获取（非畸变时）
+                if (playerId == 0 && !string.IsNullOrEmpty(heroCardId))
                 {
                     var localController = _hm.GetLocalControllerIdPublic();
                     if (localController != null)
@@ -798,14 +800,19 @@ public class GameMonitorService : IDisposable
             var boardState = _hm.GetOpponentBoardState();
             var heroCardId = boardState?.HeroCardId ?? _hm.GetOpponentHeroCardId() ?? "";
 
-            // 从 EntityTracker 获取对手的 PLAYER_ID（Power.log 数据，最可靠）
-            int playerId = 0;
-            foreach (var entity in _entityTracker.Entities.Values)
+            // 优先从 ZONE_PLAY 英雄实体直接读取 PLAYER_ID（畸变时也能正确识别）
+            int playerId = _hm.GetOpponentPlayerIdInPlay();
+
+            // fallback: 从 EntityTracker 获取
+            if (playerId == 0 && !string.IsNullOrEmpty(heroCardId))
             {
-                if (entity.IsHero && entity.CardId == heroCardId && entity.Controller != localController.Value && entity.Controller > 0)
+                foreach (var entity in _entityTracker.Entities.Values)
                 {
-                    playerId = entity.GetTag(2); // PLAYER_ID
-                    break;
+                    if (entity.IsHero && entity.CardId == heroCardId && entity.Controller != localController.Value && entity.Controller > 0)
+                    {
+                        playerId = entity.GetTag(2); // PLAYER_ID
+                        break;
+                    }
                 }
             }
 
@@ -959,23 +966,23 @@ public class GameMonitorService : IDisposable
             }
 
             var heroCardId = boardState.HeroCardId ?? "";
-            if (string.IsNullOrEmpty(heroCardId))
-            {
-                Log("[Snapshot] 英雄 CardId 为空");
-                return;
-            }
 
-            // 从 EntityTracker 获取对手的 PLAYER_ID（Power.log 数据，最可靠）
-            var localController = _hm.GetLocalControllerIdPublic();
-            int playerId = 0;
-            if (localController != null)
+            // 优先从 ZONE_PLAY 英雄实体直接读取 PLAYER_ID（畸变时也能正确识别）
+            int playerId = _hm.GetOpponentPlayerIdInPlay();
+
+            // fallback: 从 EntityTracker 获取
+            if (playerId == 0 && !string.IsNullOrEmpty(heroCardId))
             {
-                foreach (var entity in _entityTracker.Entities.Values)
+                var localController = _hm.GetLocalControllerIdPublic();
+                if (localController != null)
                 {
-                    if (entity.IsHero && entity.CardId == heroCardId && entity.Controller != localController.Value && entity.Controller > 0)
+                    foreach (var entity in _entityTracker.Entities.Values)
                     {
-                        playerId = entity.GetTag(2); // PLAYER_ID
-                        break;
+                        if (entity.IsHero && entity.CardId == heroCardId && entity.Controller != localController.Value && entity.Controller > 0)
+                        {
+                            playerId = entity.GetTag(2); // PLAYER_ID
+                            break;
+                        }
                     }
                 }
             }

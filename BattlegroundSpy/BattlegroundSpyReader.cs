@@ -682,9 +682,9 @@ public sealed class BattlegroundSpyReader : IDisposable
     }
 
     /// <summary>
-    /// 获取鼠标悬停的排行榜玩家的 PLAYER_ID (tag 2)。
-    /// 用于缓存键匹配，比 heroCardId 更可靠（唯一、不重复）。
-    /// 流程: tile entity → hero card ID → m_entityMap 查找 → tag 2 (PLAYER_ID)
+    /// 获取鼠标悬停的排行榜玩家的 PLAYER_ID。
+    /// 优先直接从 tile.m_playerId 读取（唯一、不受畸变影响），
+    /// fallback 到 entity tag 2 (PLAYER_ID)，最后才用 heroCardId 查找。
     /// </summary>
     public int GetLeaderboardHoveredPlayerId()
     {
@@ -696,15 +696,27 @@ public sealed class BattlegroundSpyReader : IDisposable
             dynamic tile = leaderboard["m_currentlyMousedOverTile"];
             if (tile == null) return 0;
 
+            // 优先直接从 tile 读取 m_playerId（排行榜条目自带，唯一且稳定）
+            try
+            {
+                int directPlayerId = (int)tile["m_playerId"];
+                if (directPlayerId != 0) return directPlayerId;
+            }
+            catch { }
+
             dynamic entity = tile["m_entity"];
             if (entity == null) return 0;
 
-            // 从 tile entity 读取 hero card ID（这个是可靠的）
+            // fallback: 从 entity 的 tags 读取 PLAYER_ID
+            var tags = ReadTagDict(entity["m_tags"]?["m_values"]);
+            int playerId = GetTagValue(tags, 2); // PLAYER_ID
+            if (playerId != 0) return playerId;
+
+            // 最后 fallback: 用 hero card ID 查找（畸变时可能不准）
             string heroCardId = null;
             try { heroCardId = (string)entity["m_cardIdInternal"]; } catch { }
             if (string.IsNullOrEmpty(heroCardId)) return 0;
 
-            // 用 hero card ID 在 m_entityMap 中查找 game entity，读取 PLAYER_ID
             return GetPlayerIdByHeroCardId(heroCardId);
         }
         catch
@@ -1175,6 +1187,65 @@ public sealed class BattlegroundSpyReader : IDisposable
         {
             Console.WriteLine($"[BGSpy] GetOpponentHeroCardId failed: {ex.Message}");
             return null;
+        }
+    }
+
+    /// <summary>
+    /// 获取当前战斗对手的 PLAYER_ID（直接从 ZONE_PLAY 的英雄实体读取 tag 2）。
+    /// 不依赖 heroCardId 查找，畸变时也能正确识别唯一对手。
+    /// </summary>
+    public int GetOpponentPlayerIdInPlay()
+    {
+        try
+        {
+            var localController = GetLocalControllerId();
+            if (localController == null) return 0;
+
+            var gameState = _image?["GameState"]?["s_instance"];
+            if (gameState == null) return 0;
+
+            dynamic entityMap = gameState["m_entityMap"];
+            if (entityMap == null) return 0;
+
+            dynamic valueSlots = entityMap["valueSlots"];
+            if (valueSlots == null) return 0;
+            int size = GetCollectionSize(valueSlots);
+
+            for (int i = 0; i < size; i++)
+            {
+                try
+                {
+                    var node = valueSlots[i];
+                    if (node == null) continue;
+
+                    var tags = ReadTagDict(node["m_tags"]?["m_values"]);
+                    int cardType = GetTagValue(tags, 202); // CARDTYPE
+                    if (cardType != 3) continue; // 只要 HERO
+
+                    int zone = GetTagValue(tags, 49); // ZONE
+                    if (zone != 1) continue; // ZONE_PLAY = 1
+
+                    int controller = GetTagValue(tags, 50); // CONTROLLER
+                    if (controller == localController.Value) continue; // 跳过本地玩家
+
+                    string cardId = (string)node["m_cardIdInternal"];
+                    if (string.IsNullOrEmpty(cardId)) continue;
+                    if (cardId == "TB_BaconShopBob") continue;
+
+                    int playerId = GetTagValue(tags, 2); // PLAYER_ID
+                    Console.WriteLine($"[BGSpy] GetOpponentPlayerIdInPlay: playerId={playerId} (hero={cardId})");
+                    return playerId;
+                }
+                catch { continue; }
+            }
+
+            Console.WriteLine("[BGSpy] GetOpponentPlayerIdInPlay: no opponent hero in ZONE_PLAY");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[BGSpy] GetOpponentPlayerIdInPlay failed: {ex.Message}");
+            return 0;
         }
     }
 
