@@ -112,8 +112,8 @@ public partial class OverlayWindow : Window
     {
         _hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
 
-        // BobsBuddy 始终显示
-        BobsBuddyPanel.Visibility = Visibility.Visible;
+        // BobsBuddy 初始隐藏，进入 BG 时才显示
+        BobsBuddyPanel.Visibility = Visibility.Collapsed;
 
         // 安装前台窗口切换钩子（即时回调，无轮询延迟）
         _winEventProc = OnForegroundChanged;
@@ -1184,6 +1184,7 @@ public partial class OverlayWindow : Window
             DisconnectBtn.Content = "一键拔线";
             DisconnectBtn.IsEnabled = true;
             GameToolsPanel.Visibility = Visibility.Visible;
+            BobsBuddyPanel.Visibility = Visibility.Visible;
         });
     }
 
@@ -1191,7 +1192,11 @@ public partial class OverlayWindow : Window
     {
         _disconnectTimer?.Change(Timeout.Infinite, Timeout.Infinite);
         DisconnectService.EndReconnect();
-        Dispatcher.Invoke(() => GameToolsPanel.Visibility = Visibility.Collapsed);
+        Dispatcher.Invoke(() =>
+        {
+            GameToolsPanel.Visibility = Visibility.Collapsed;
+            BobsBuddyPanel.Visibility = Visibility.Collapsed;
+        });
     }
 
     public void UpdateTurnNumber(int turnNumber)
