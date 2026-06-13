@@ -27,24 +27,17 @@
   <!-- Project references -->
   <ItemGroup>
     <ProjectReference Include="BattlegroundSpy\BattlegroundSpy.csproj" />
-    <ProjectReference Include="Plugins\HdtCompat\HdtCompat.csproj" />
-    <ProjectReference Include="Plugins\BobsBuddyCompat\BobsBuddyCompat.csproj" />
   </ItemGroup>
 
   <!-- NuGet packages -->
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="WindowsFirewallHelper" Version="2.1.4.81" />
   </ItemGroup>
 
   <!-- Assembly references -->
   <ItemGroup>
     <Reference Include="BattlegroundDB">
       <HintPath>Lib\BattlegroundDB.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="HBTCombat">
-      <HintPath>Lib\HBTCombat.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System.Net.Http" />

@@ -4,11 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using BattlegroundSpy.Objects;
 using HBT.Models;
-using HBT.Plugins;
-using HBTCombat;
 
 namespace HBT.Services
 {
@@ -45,7 +42,6 @@ public class GameMonitorService : IDisposable
     private readonly Config _config;
     private readonly HearthMirrorService _hm;
     private readonly LeagueClient _league;
-    private readonly PluginManager _plugins;
     private readonly EntityTracker _entityTracker = new EntityTracker();
 
     // 游戏状态
@@ -62,7 +58,6 @@ public class GameMonitorService : IDisposable
     private string _localPlayerDisplayName = "";
     private bool _playerNameReported;
     private bool _hmReady;
-    private bool _racesFetched;
     private bool _scanning;
     private int _lastKnownMmr;
     private int _startMmr;
@@ -76,34 +71,7 @@ public class GameMonitorService : IDisposable
     // 线程
     private Thread _sceneThread;
     private Thread _logThread;
-    private Thread _hoverThread;
     private volatile bool _running;
-
-    // 悬停状态
-    private string _lastHoveredHeroCardId = "";
-    private int _lastHoveredPlayerId = 0;
-
-    /// <summary>对手阵容记录</summary>
-    private class OpponentBoardRecord
-    {
-        public List<Dictionary<string, object>> BoardState { get; set; }
-        public int CapturedTurn { get; set; }  // 捕获时的实际回合数
-        public string HeroCardId { get; set; }
-        public int PlayerId { get; set; }       // PLAYER_ID (tag 2)，唯一标识
-    }
-
-    // 对手阵容缓存（按 PLAYER_ID 索引，唯一且稳定）
-    private readonly Dictionary<int, OpponentBoardRecord> _opponentBoardCache = new();
-    private OpponentBoardRecord _lastCapturedRecord;
-    private bool _boardCapturedThisCombat;
-
-    // teamId → Lo 映射（用于 update-placement 匹配）
-    private readonly Dictionary<int, ulong> _teamIdToLo = new();
-    // playerId → Lo 映射（从大厅 m_playerMap 构建，用于匹配排行榜）
-    private Dictionary<int, ulong> _playerIdToLo = new();
-
-    // 回合数跟踪
-    private int _lastRawTurn;
 
     // 事件
     public event Action<GamePhase, Game> OnPhaseChanged;
@@ -113,11 +81,6 @@ public class GameMonitorService : IDisposable
     public event Action<string> OnPlayerNameChanged;  // 格式: "玩家名#1234 (CN)"
     public event Action<int> OnMmrChanged;
     public event Action<int> OnSceneChanged;  // 场景变化（UI 显示用）
-    public event Action<List<string>>? OnAvailableRacesChanged;  // 本局可用种族代码
-    public event Action<int> OnGameStarted;  // 游戏开始（记分板用，参数为起始 MMR）
-    public event Action<string, List<Dictionary<string, object>>?, int, string> OnOpponentBoardHover;  // 对手阵容悬停（英雄卡牌ID, 阵容数据, 回合数, 对战胜率文本）
-    public event Action<int> OnTurnNumberChanged;  // 回合数变化（参数为实际回合数）
-    public event Action<float, float, float, int, int, float, int, int, float> OnCombatSimulationResult;  // 战斗模拟结果
 
     public GamePhase Phase => _phase;
     public string VerifyCode => _verifyCode;
@@ -133,13 +96,8 @@ public class GameMonitorService : IDisposable
         _hm = hm;
         ApiClient.Init(config.ApiBaseUrl);
         GameStore.Init();
-        BoardStateStore.Init();
-        // HeadToHeadStore 在获取到 localPlayerLo 后初始化
         _league = new LeagueClient(config);
         _league.OnStateChanged = OnLeagueStateChanged;
-        _plugins = new PluginManager(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Plugins"));
-        _plugins.OnLog = msg => Log(msg);
-        _plugins.LoadAll();
     }
 
     public void Start()
@@ -154,10 +112,6 @@ public class GameMonitorService : IDisposable
         // LogWatcher：Power.log 解析（游戏状态主驱动）
         _logThread = new Thread(LogWatcherLoop) { IsBackground = true, Name = "LogWatcher" };
         _logThread.Start();
-
-        // HoverWatcher：排行榜悬停检测（对手阵容显示）
-        _hoverThread = new Thread(HoverWatcherLoop) { IsBackground = true, Name = "HoverWatcher" };
-        _hoverThread.Start();
     }
 
     public void Stop() => _running = false;
@@ -392,9 +346,6 @@ public class GameMonitorService : IDisposable
                     if (evt != null)
                         HandleParserEvent(evt);
                 }
-
-                // 插件定时更新
-                _plugins.Update();
             }
             catch (Exception ex)
             {
@@ -422,19 +373,11 @@ public class GameMonitorService : IDisposable
                 _gameGeneration++;
                 _league.Reset();
                 _currentGameUuid = "";
-                _racesFetched = false;
-                _entityTracker.Clear(); // 清除实体追踪
-                _opponentBoardCache.Clear(); // 清除对手阵容缓存
-                _lastCapturedRecord = null;
                 SetPhase(GamePhase.PreLobby);
                 if (!string.IsNullOrEmpty(_currentGame.HeroName))
                     Log($"新对局开始 - 英雄: {_currentGame.HeroName}");
                 else
                     Log("新对局开始");
-                // 提前读取种族（此时内存可能已就绪）
-                _racesFetched = TryReadAvailableRaces();
-                // 通知插件
-                _plugins.OnGameStart();
                 break;
 
             case ReconnectEvent:
@@ -490,27 +433,6 @@ public class GameMonitorService : IDisposable
             case ConcedeEvent:
                 HandleGameEnd(new GameEndEvent { Placement = 8 });
                 break;
-
-            case CombatStartEvent:
-                // BG 战斗阶段开始：立即捕获对手阵容
-                Log($"[Debug] CombatStartEvent 收到, phase={_phase}");
-                if (_phase == GamePhase.Active)
-                {
-                    HandleCombatStart();
-                }
-                else
-                {
-                    Log($"[Debug] phase={_phase}, 跳过 HandleCombatStart");
-                }
-                break;
-
-            case BoardSnapshotEvent:
-                // BG 阵容快照：tag 3533 1→0，对齐 HDT SnapshotCurrentBoard 时机
-                if (_phase == GamePhase.Active)
-                {
-                    HandleBoardSnapshot();
-                }
-                break;
         }
     }
 
@@ -521,10 +443,6 @@ public class GameMonitorService : IDisposable
     private void HandleCheckLeague()
     {
         Log("获取大厅玩家信息...");
-
-        // 种族：PreLobby 可能已读取，未成功则再试一次
-        if (!_racesFetched)
-            _racesFetched = TryReadAvailableRaces();
 
         // 大厅信息：带重试（英雄信息可能延迟填充）
         BattlegroundsLobbyInfo lobbyInfo = null;
@@ -578,14 +496,6 @@ public class GameMonitorService : IDisposable
 
         _currentGame.LobbyPlayers = players;
 
-        // 保存 playerId → Lo 映射（从 m_playerMap 构建，用于匹配排行榜）
-        _playerIdToLo = lobbyInfo.PlayerIdToLo ?? new Dictionary<int, ulong>();
-        Console.WriteLine($"[Mapping] playerId→Lo: {_playerIdToLo.Count} entries");
-
-        // 构建 teamId → Lo 映射（延迟到首次获取排名时构建）
-        // 此时 LobbyPlayers 已就绪，等 GetPlayerRankings() 返回后再匹配
-        _teamIdToLo.Clear();
-
         // 从大厅数据设置英雄信息（BGSpy 优先于 Parser 的 HERO_ENTITY 匹配）
         {
             var me = players.FirstOrDefault(p =>
@@ -620,10 +530,7 @@ public class GameMonitorService : IDisposable
 
         // 记录起始 MMR（记分板用）
         if (_lastKnownMmr > 0 && _startMmr == 0)
-        {
             _startMmr = _lastKnownMmr;
-            OnGameStarted?.Invoke(_startMmr);
-        }
 
         if (_localPlayerLo == 0)
         {
@@ -645,474 +552,6 @@ public class GameMonitorService : IDisposable
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  HoverWatcher - 排行榜悬停检测（对手阵容显示）
-    // ═══════════════════════════════════════════════════════════════
-
-    private void HoverWatcherLoop()
-    {
-        while (_running)
-        {
-            Thread.Sleep(100);  // 每 100ms 检测一次
-
-            try
-            {
-                // 只在战棋游戏中检测
-                if (_phase != GamePhase.Active && _phase != GamePhase.PostGame)
-                {
-                    if (!string.IsNullOrEmpty(_lastHoveredHeroCardId))
-                    {
-                        _lastHoveredHeroCardId = "";
-                        OnOpponentBoardHover?.Invoke("", null, 0, "");
-                    }
-                    _boardCapturedThisCombat = false;
-                    _lastRawTurn = 0;
-                    continue;
-                }
-
-                // 更新回合数
-                var rawTurn = _hm.GetTurnNumber();
-                if (rawTurn != null && rawTurn.Value != _lastRawTurn)
-                {
-                    _lastRawTurn = rawTurn.Value;
-                    // 只在奇数 rawTurn 时更新（偶数 rawTurn 是战斗阶段，回合数不变）
-                    if (rawTurn.Value % 2 == 1)
-                    {
-                        var actualTurn = (rawTurn.Value + 1) / 2;
-                        OnTurnNumberChanged?.Invoke(actualTurn);
-                    }
-                }
-                // rawTurn 为 0 时（英雄选择阶段），显示第 1 回合
-                else if (rawTurn == null || rawTurn.Value == 0)
-                {
-                    if (_lastRawTurn != 0)
-                    {
-                        _lastRawTurn = 0;
-                    }
-                    OnTurnNumberChanged?.Invoke(1);
-                }
-
-                var heroCardId = _hm.GetLeaderboardHoveredHeroCardId();
-
-                // 优先从 tile 直接读取 PLAYER_ID
-                int playerId = _hm.GetLeaderboardHoveredPlayerId();
-
-                // fallback: 通过 entity ID 在 EntityTracker 中查找（对齐 HDT 方案）
-                if (playerId == 0)
-                {
-                    int entityId = _hm.GetLeaderboardHoveredEntityId();
-                    if (entityId > 0 && _entityTracker.Entities.TryGetValue(entityId, out var entity))
-                    {
-                        playerId = entity.GetTag(2); // PLAYER_ID
-                    }
-                }
-
-                // fallback: 通过 heroCardId 在 EntityTracker 中查找
-                if (playerId == 0 && !string.IsNullOrEmpty(heroCardId))
-                {
-                    var localController = _hm.GetLocalControllerIdPublic();
-                    if (localController != null)
-                    {
-                        foreach (var entity in _entityTracker.Entities.Values)
-                        {
-                            if (entity.IsHero && entity.CardId == heroCardId && entity.Controller != localController.Value && entity.Controller > 0)
-                            {
-                                playerId = entity.GetTag(2); // PLAYER_ID
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                // 悬停变化（用 playerId + heroCardId 判断变化）
-                if (playerId != _lastHoveredPlayerId || heroCardId != _lastHoveredHeroCardId)
-                {
-                    _lastHoveredHeroCardId = heroCardId ?? "";
-                    _lastHoveredPlayerId = playerId;
-
-                    if (string.IsNullOrEmpty(heroCardId) && playerId == 0)
-                    {
-                        // 移开鼠标，清除显示
-                        OnOpponentBoardHover?.Invoke("", null, 0, "");
-                    }
-                    else
-                    {
-                        // 从缓存查找对手阵容（优先用 PLAYER_ID，fallback 到 heroCardId）
-                        OpponentBoardRecord record = null;
-
-                        if (playerId > 0 && _opponentBoardCache.TryGetValue(playerId, out var cached))
-                        {
-                            record = cached;
-                        }
-                        else if (_lastCapturedRecord != null && _lastCapturedRecord.PlayerId == playerId && playerId > 0)
-                        {
-                            record = _lastCapturedRecord;
-                        }
-                        else
-                        {
-                            Log($"悬停未命中: playerId={playerId} ({heroCardId})");
-                        }
-
-                        // 查找对手 Lo（用于胜率查询）
-                        ulong opponentLo = 0;
-                        if (playerId > 0 && _playerIdToLo.TryGetValue(playerId, out var mappedLo))
-                            opponentLo = mappedLo;
-                        else if (heroCardId != null)
-                        {
-                            var matched = _currentGame.LobbyPlayers.FirstOrDefault(lp =>
-                                string.Equals(lp.HeroCardId, heroCardId, StringComparison.OrdinalIgnoreCase));
-                            if (matched != null) opponentLo = matched.Lo;
-                        }
-
-                        // 查询胜率（无记录也显示 0-0）
-                        var h2h = HeadToHeadStore.GetRecord(opponentLo);
-                        var h2hTotal = h2h.Wins + h2h.Losses;
-                        var h2hText = h2hTotal > 0
-                            ? $"{h2h.Wins}-{h2h.Losses} ({(double)h2h.Wins / h2hTotal * 100:F0}%)"
-                            : "0-0 (0%)";
-
-                        if (record == null)
-                        {
-                            // 未遇到过该对手（显示胜率，不显示阵容）
-                            OnOpponentBoardHover?.Invoke(heroCardId, null, 0, h2hText);
-                        }
-                        else
-                        {
-                            // 计算回合差
-                            var currentTurn = GetActualTurn(_lastRawTurn);
-                            var turnsAgo = currentTurn - record.CapturedTurn;
-
-                            // 阵容可能为空（遇到过但场面无随从）
-                            var boardState = record.BoardState ?? new List<Dictionary<string, object>>();
-                            OnOpponentBoardHover?.Invoke(heroCardId, boardState, turnsAgo, h2hText);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Hover] 异常: {ex.Message}");
-            }
-        }
-    }
-
-
-    /// <summary>计算实际回合数（rawTurn → actualTurn）</summary>
-    private int GetActualTurn(int rawTurn)
-    {
-        return rawTurn % 2 == 0 ? rawTurn / 2 : (rawTurn + 1) / 2;
-    }
-
-    /// <summary>BG 战斗阶段开始：从 EntityTracker 获取对手阵容（纯 HDT 方案）</summary>
-    private void HandleCombatStart()
-    {
-        try
-        {
-            Log("战斗阶段开始，从 EntityTracker 获取对手阵容");
-
-            // 等待一小段时间让 EntityTracker 收集当前战斗的数据
-            Thread.Sleep(100);
-
-            // 从 EntityTracker 获取对手随从（ZONE=PLAY, CARDTYPE=MINION, CONTROLLER≠本地）
-            var localController = _hm.GetLocalControllerIdPublic();
-            if (localController == null)
-            {
-                return;
-            }
-            var opponentMinions = _entityTracker.GetOpponentMinions(localController.Value);
-
-            // 用 BGSpy 获取对手英雄 cardId
-            var boardState = _hm.GetOpponentBoardState();
-            var heroCardId = boardState?.HeroCardId ?? _hm.GetOpponentHeroCardId() ?? "";
-
-            // 优先从 ZONE_PLAY 英雄实体直接读取 PLAYER_ID（畸变时也能正确识别）
-            int playerId = _hm.GetOpponentPlayerIdInPlay();
-
-            // fallback: 从 EntityTracker 获取
-            if (playerId == 0 && !string.IsNullOrEmpty(heroCardId))
-            {
-                foreach (var entity in _entityTracker.Entities.Values)
-                {
-                    if (entity.IsHero && entity.CardId == heroCardId && entity.Controller != localController.Value && entity.Controller > 0)
-                    {
-                        playerId = entity.GetTag(2); // PLAYER_ID
-                        break;
-                    }
-                }
-            }
-
-            Log($"英雄: {heroCardId}, playerId={playerId}");
-
-            // 转换为字典格式（即使为空也要保存，表示遇到过该对手）
-            var boardDicts = new List<Dictionary<string, object>>();
-            foreach (var minion in opponentMinions)
-            {
-                boardDicts.Add(new Dictionary<string, object>
-                {
-                    ["cardId"] = minion.CardId,
-                    ["attack"] = minion.Attack,
-                    ["health"] = minion.MaxHealth,
-                    ["golden"] = minion.Golden,
-                    ["taunt"] = minion.Taunt,
-                    ["divineShield"] = minion.DivineShield,
-                    ["poisonous"] = minion.Poisonous,
-                    ["venomous"] = minion.Venomous,
-                    ["windfury"] = minion.Windfury,
-                    ["reborn"] = minion.Reborn,
-                    ["stealth"] = minion.Stealth,
-                    ["deathrattle"] = minion.Deathrattle,
-                    ["techLevel"] = minion.TechLevel,
-                });
-            }
-
-            // 计算实际回合数
-            var actualTurn = GetActualTurn(_lastRawTurn);
-
-            var record = new OpponentBoardRecord
-            {
-                BoardState = boardDicts,
-                CapturedTurn = actualTurn,
-                HeroCardId = heroCardId,
-                PlayerId = playerId,
-            };
-
-            _lastCapturedRecord = record;
-            _boardCapturedThisCombat = true;
-
-            // 用 PLAYER_ID 作为缓存键（唯一且稳定）
-            if (playerId > 0)
-            {
-                if (_opponentBoardCache.TryGetValue(playerId, out var old))
-                    Log($"覆盖缓存: playerId={playerId} ({heroCardId}) 旧回合{old.CapturedTurn}→新回合{actualTurn}");
-
-                _opponentBoardCache[playerId] = record;
-                Log($"战斗开始捕获: playerId={playerId} ({heroCardId}), {boardDicts.Count}个随从, 回合{actualTurn}");
-            }
-            else
-            {
-                Log($"PlayerId=0, 跳过缓存存储 ({heroCardId})");
-            }
-
-            // 捕获完成后，清除对手随从残留（防止下次战斗累积）
-            _entityTracker.ClearStaleEntities(localController.Value);
-
-            // ── 触发战斗模拟 ──
-            RunCombatSimulation(opponentMinions, heroCardId);
-        }
-        catch (Exception ex)
-        {
-            Log($"战斗开始捕获失败: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// 运行战斗模拟（后台线程）
-    /// </summary>
-    private void RunCombatSimulation(List<TrackedEntity> opponentMinions, string opponentHeroCardId)
-    {
-        Log($"[模拟] RunCombatSimulation 被调用, 对手随从={opponentMinions.Count}");
-        try
-        {
-            // 读取己方阵容（允许为空）
-            var playerMinions = _hm.GetPlayerBoardMinions() ?? new List<BoardMinion>();
-            Log($"[模拟] 己方随从={playerMinions.Count}");
-
-            // 构建输入（允许一方为空）
-            int playerTier = playerMinions.Count > 0 ? playerMinions.Max(m => m.TechLevel) : 6;
-            var input = new SimulationInput
-            {
-                PlayerHealth = _lastKnownMmr > 0 ? 40 : 40,
-                OpponentHealth = 40,
-                PlayerTier = playerTier,
-                OpponentTier = 6, // 排行榜对手通常是高本
-                Turn = GetActualTurn(_lastRawTurn),
-                DamageCap = _hm.GetDamageCap(),
-            };
-
-            // 转换己方随从
-            foreach (var m in playerMinions)
-            {
-                var sim = SimMinion.Create(m.CardId, m.Attack, m.MaxHealth, m.TechLevel);
-                sim.Taunt = m.Taunt;
-                sim.DivineShield = m.DivineShield;
-                sim.Poisonous = m.Poisonous;
-                sim.Venomous = m.Venomous;
-                sim.Windfury = m.Windfury;
-                sim.Reborn = m.Reborn;
-                sim.Golden = m.Golden;
-                sim.Cleave = IsCleaveMinion(m.CardId);
-                // TODO: 亡语回调（后续实现）
-                input.PlayerBoard.Add(sim);
-            }
-
-            // 转换对手随从
-            foreach (var m in opponentMinions)
-            {
-                var sim = SimMinion.Create(m.CardId, m.Attack, m.MaxHealth, m.TechLevel);
-                sim.Taunt = m.Taunt;
-                sim.DivineShield = m.DivineShield;
-                sim.Poisonous = m.Poisonous;
-                sim.Venomous = m.Venomous;
-                sim.Windfury = m.Windfury;
-                sim.Reborn = m.Reborn;
-                sim.Golden = m.Golden;
-                sim.Cleave = IsCleaveMinion(m.CardId);
-                input.OpponentBoard.Add(sim);
-            }
-
-            Log($"[模拟] 开始模拟: 己方{input.PlayerBoard.Count}个 vs 对方{input.OpponentBoard.Count}个, DamageCap={input.DamageCap}");
-
-            // 后台运行模拟
-            Task.Run(() =>
-            {
-                var result = SimulationRunner.Run(input, iterations: 2000, maxMs: 500);
-                Log($"[模拟] 完成: 胜{result.WinRate * 100:F0}% 平{result.TieRate * 100:F0}% 负{result.LossRate * 100:F0}% 我方{result.PlayerDamageMin}~{result.PlayerDamageMax} 对方{result.OpponentDamageMin}~{result.OpponentDamageMax}");
-                OnCombatSimulationResult?.Invoke(
-                    result.WinRate, result.TieRate, result.LossRate,
-                    result.PlayerDamageMin, result.PlayerDamageMax, result.PlayerDamageAvg,
-                    result.OpponentDamageMin, result.OpponentDamageMax, result.OpponentDamageAvg);
-            });
-        }
-        catch (Exception ex)
-        {
-            Log($"[模拟] 异常: {ex.Message}");
-        }
-    }
-
-    /// <summary>已知顺劈随从 CardId 列表</summary>
-    private static readonly HashSet<string> CleaveMinions = new HashSet<string>
-    {
-        "BOT_559",      // 洞穴九头蛇 Cave Hydra
-        "BG22_002",     // 急速潜行者 Frenzied Lefthander
-        "BG26_127",     // 潮汐女皇 Tidal Empress
-        "LOE_073",      // 迪恩巴拉瑟布甲虫 Djinn-Bound Scarab
-    };
-
-    private static bool IsCleaveMinion(string cardId) => CleaveMinions.Contains(cardId);
-
-    /// <summary>
-    /// BG 阵容快照：tag 3533 1→0 时触发（对齐 HDT SnapshotCurrentBoard）。
-    /// 用 BGSpy 读取实时内存快照，替代 EntityTracker（Power.log 累积）。
-    /// </summary>
-    private void HandleBoardSnapshot()
-    {
-        try
-        {
-            // 用 BGSpy 读取对手场面（实时内存快照，类似 HDT 的 _game.Entities）
-            var boardState = _hm.GetOpponentBoardState();
-            if (boardState == null)
-            {
-                Log("[Snapshot] GetOpponentBoardState 返回 null");
-                return;
-            }
-
-            var heroCardId = boardState.HeroCardId ?? "";
-
-            // 优先从 ZONE_PLAY 英雄实体直接读取 PLAYER_ID（畸变时也能正确识别）
-            int playerId = _hm.GetOpponentPlayerIdInPlay();
-
-            // fallback: 从 EntityTracker 获取
-            if (playerId == 0 && !string.IsNullOrEmpty(heroCardId))
-            {
-                var localController = _hm.GetLocalControllerIdPublic();
-                if (localController != null)
-                {
-                    foreach (var entity in _entityTracker.Entities.Values)
-                    {
-                        if (entity.IsHero && entity.CardId == heroCardId && entity.Controller != localController.Value && entity.Controller > 0)
-                        {
-                            playerId = entity.GetTag(2); // PLAYER_ID
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // 转换为字典格式，限制最多 7 个随从（BG 场面上限）
-            var boardDicts = new List<Dictionary<string, object>>();
-            foreach (var card in boardState.BoardCards.Take(7))
-            {
-                boardDicts.Add(new Dictionary<string, object>
-                {
-                    ["cardId"] = card.CardId,
-                    ["attack"] = card.Attack,
-                    ["health"] = card.Health,
-                    ["golden"] = card.Golden,
-                    ["taunt"] = card.Taunt,
-                    ["divineShield"] = card.DivineShield,
-                    ["poisonous"] = card.Poisonous,
-                    ["venomous"] = card.Venomous,
-                    ["windfury"] = card.Windfury,
-                    ["reborn"] = card.Reborn,
-                    ["stealth"] = card.Stealth,
-                    ["deathrattle"] = card.Deathrattle,
-                    ["techLevel"] = card.TechLevel,
-                });
-            }
-
-            var actualTurn = GetActualTurn(_lastRawTurn);
-
-            var record = new OpponentBoardRecord
-            {
-                BoardState = boardDicts,
-                CapturedTurn = actualTurn,
-                HeroCardId = heroCardId,
-                PlayerId = playerId,
-            };
-
-            _lastCapturedRecord = record;
-            _boardCapturedThisCombat = true;
-
-            // 用 PLAYER_ID 作为缓存键（唯一且稳定）
-            if (playerId > 0)
-            {
-                if (_opponentBoardCache.TryGetValue(playerId, out var old))
-                    Log($"[Snapshot] 覆盖缓存: playerId={playerId} ({heroCardId}) 旧回合{old.CapturedTurn}→新回合{actualTurn}");
-
-                _opponentBoardCache[playerId] = record;
-                Log($"阵容快照: playerId={playerId} ({heroCardId}), {boardDicts.Count}个随从, 回合{actualTurn}");
-            }
-            else
-            {
-                Log($"[Snapshot] PlayerId=0, 跳过缓存存储 ({heroCardId})");
-            }
-        }
-        catch (Exception ex)
-        {
-            Log($"阵容快照失败: {ex.Message}");
-        }
-    }
-
-    /// <summary>构建 teamId → Lo 映射（优先用 playerId，fallback 到 heroCardId）</summary>
-    private void BuildTeamIdToLoMapping(List<(string heroCardId, int placement, bool isDead, int teamId, int playerId)> rankings)
-    {
-        _teamIdToLo.Clear();
-        foreach (var (heroCardId, _, _, teamId, playerId) in rankings)
-        {
-            ulong lo = 0;
-
-            // 优先用 playerId 匹配（不受英雄重复影响）
-            if (playerId != 0 && _playerIdToLo.TryGetValue(playerId, out var mappedLo) && mappedLo != 0)
-            {
-                lo = mappedLo;
-            }
-            else
-            {
-                // fallback: 用 heroCardId 匹配 LobbyPlayers
-                var matched = _currentGame.LobbyPlayers.FirstOrDefault(lp =>
-                    string.Equals(lp.HeroCardId, heroCardId, StringComparison.OrdinalIgnoreCase));
-                if (matched != null && matched.Lo != 0)
-                    lo = matched.Lo;
-            }
-
-            if (lo != 0)
-            {
-                _teamIdToLo[teamId] = lo;
-                Console.WriteLine($"[Mapping] teamId={teamId} → Lo={lo} (playerId={playerId}, hero={heroCardId})");
-            }
-        }
-    }
-
-    // ═══════════════════════════════════════
     //  兜底：场景 4→15 强制结束
     // ═══════════════════════════════════════
 
@@ -1197,7 +636,6 @@ public class GameMonitorService : IDisposable
     {
         _league.StopRetry();
         SetPhase(GamePhase.PostGame);
-        _entityTracker.Clear(); // 清空实体追踪，防止下局累积
 
         // 游戏结束时清空拔线缓存（与团子版对齐：HandleGameEnd 立即禁用拔线）
         DisconnectService.IsGameEnded = true;
@@ -1226,37 +664,15 @@ public class GameMonitorService : IDisposable
         // ── 计算 otherPlacements（所有对局共用）──
         var otherPlacements = new List<(ulong lo, int placement)>();
 
-        // 从内存读取实时排名
-        var rankings = _hm.GetPlayerRankings();
-        if (rankings.Count > 0)
+        // 从 AllHeroes 读取（Power.log 解析的数据）
+        foreach (var hero in _currentGame.AllHeroes.Values)
         {
-            // 构建 teamId → Lo 映射（如果还没构建）
-            if (_teamIdToLo.Count == 0)
-                BuildTeamIdToLoMapping(rankings);
-
-            foreach (var (heroCardId, rank, isDead, teamId, playerId) in rankings)
+            if (hero.Placement > placement)
             {
-                // 排名比自己低的玩家
-                if (rank > placement)
-                {
-                    // 用 teamId 查找 Lo
-                    if (_teamIdToLo.TryGetValue(teamId, out var lo) && lo != 0 && lo != _localPlayerLo)
-                        otherPlacements.Add((lo, rank));
-                }
-            }
-        }
-        else
-        {
-            // 备用方案：从 AllHeroes 读取（Power.log 解析的数据）
-            foreach (var hero in _currentGame.AllHeroes.Values)
-            {
-                if (hero.Placement > placement)
-                {
-                    var matched = _currentGame.LobbyPlayers.FirstOrDefault(lp =>
-                        string.Equals(lp.HeroCardId, hero.CardId, StringComparison.OrdinalIgnoreCase));
-                    if (matched != null && matched.Lo != 0 && matched.Lo != _localPlayerLo)
-                        otherPlacements.Add((matched.Lo, hero.Placement));
-                }
+                var matched = _currentGame.LobbyPlayers.FirstOrDefault(lp =>
+                    string.Equals(lp.HeroCardId, hero.CardId, StringComparison.OrdinalIgnoreCase));
+                if (matched != null && matched.Lo != 0 && matched.Lo != _localPlayerLo)
+                    otherPlacements.Add((matched.Lo, hero.Placement));
             }
         }
 
@@ -1280,17 +696,6 @@ public class GameMonitorService : IDisposable
             }
         }
 
-        // ── 记录对战胜负（所有对局）──
-        if (_localPlayerLo != 0)
-        {
-            var wonSet = new HashSet<ulong>(otherPlacements.Select(p => p.lo));
-            foreach (var lp in _currentGame.LobbyPlayers)
-            {
-                if (lp.Lo == 0 || lp.Lo == _localPlayerLo) continue;
-                HeadToHeadStore.RecordGame(lp.Lo, wonSet.Contains(lp.Lo));
-            }
-        }
-
         // ── 保存记录（联赛积分 + MMR 变动）──
         var points = _league.IsLeagueGame ? (placement == 1 ? 9 : Math.Max(1, 9 - placement)) : 0;
         var record = new GameRecord
@@ -1311,16 +716,10 @@ public class GameMonitorService : IDisposable
         var rcText = rc != null ? $" MMR:{rc.OldRating}→{rc.NewRating}({rc.Change:+#;-#;0})" : "";
         Log($"记录已保存 - {placement}名{rcText}");
         OnGameEnded?.Invoke(record);
-
-        // 通知插件
-        _plugins.OnGameEnd(placement, rc?.Change ?? 0);
-
-        // ── report-game-stats（rating + 阵容 + ratingChange）──
-        ReportGameStats(placement, rc);
     }
 
     // ═══════════════════════════════════════
-    //  report-game-stats
+    //  PollRatingChange
     // ═══════════════════════════════════════
 
     private RatingChangeData PollRatingChange()
@@ -1336,99 +735,6 @@ public class GameMonitorService : IDisposable
             Thread.Sleep(500);
         }
         return null;
-    }
-
-    private void ReportGameStats(int placement, RatingChangeData rc)
-    {
-        try
-        {
-            var boardState = ReadBoardState();
-            // 本地保存最终阵容
-            var boardDicts = boardState.OfType<Dictionary<string, object>>().ToList();
-            BoardStateStore.Save(_currentGameUuid, _localPlayerBattleTag, boardDicts);
-            var trinkets = ReadTrinkets();
-            var anomalyDbfId = ReadAnomalyDbfId();
-
-            Dictionary<string, object> ratingChange = null;
-            if (rc != null)
-            {
-                ratingChange = new Dictionary<string, object>
-                {
-                    ["oldRating"] = rc.OldRating,
-                    ["newRating"] = rc.NewRating,
-                    ["change"] = rc.Change,
-                };
-            }
-            ApiClient.ReportGameStatsAsync(
-                _currentGameUuid, _localPlayerBattleTag, _localPlayerLo,
-                _lastKnownMmr, boardState, ratingChange, placement, trinkets, anomalyDbfId,
-                _currentGame.HeroCardId, _currentGame.HeroName)
-                .GetAwaiter().GetResult();
-        }
-        catch (Exception ex)
-        {
-            Log($"report-game-stats 异常: {ex.Message}");
-        }
-    }
-
-    private int ReadAnomalyDbfId()
-    {
-        try { return _hm.GetAnomalyDbfId(); }
-        catch { return 0; }
-    }
-
-    private List<string> ReadTrinkets()
-    {
-        try
-        {
-            // 调试：先读详细信息看 zone 值
-            var detailed = _hm.GetPlayerTrinketsDetailed();
-            foreach (var d in detailed)
-                Log($"[DEBUG] 饰品详情: {d}");
-
-            var trinkets = _hm.GetPlayerTrinkets() ?? new List<string>();
-            Log($"[DEBUG] 读取饰品: {trinkets.Count}个");
-            return trinkets;
-        }
-        catch (Exception ex)
-        {
-            Log($"[DEBUG] 读取饰品异常: {ex.Message}");
-            return new List<string>();
-        }
-    }
-
-    private List<object> ReadBoardState()
-    {
-        var result = new List<object>();
-        try
-        {
-            var minions = _hm.GetPlayerBoardMinions();
-            if (minions == null) return result;
-            foreach (var m in minions)
-            {
-                result.Add(new Dictionary<string, object>
-                {
-                    ["cardId"] = m.CardId,
-                    ["attack"] = m.Attack,
-                    ["health"] = m.Health,
-                    ["techLevel"] = m.TechLevel,
-                    ["golden"] = m.CardId.EndsWith("_G"),
-                    ["taunt"] = m.Taunt,
-                    ["divineShield"] = m.DivineShield,
-                    ["poisonous"] = m.Poisonous,
-                    ["venomous"] = m.Venomous,
-                    ["windfury"] = m.Windfury,
-                    ["reborn"] = m.Reborn,
-                    ["stealth"] = m.Stealth,
-                    ["deathrattle"] = m.Deathrattle,
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            Log($"读取阵容失败: {ex.Message}");
-        }
-        return result;
     }
 
     // ═══════════════════════════════════════
@@ -1553,34 +859,6 @@ public class GameMonitorService : IDisposable
         }
     }
 
-    private bool TryReadAvailableRaces()
-    {
-        for (int retry = 0; retry < 3; retry++)
-        {
-            try
-            {
-                var tagRaces = _hm.GetAvailableRaces();
-                if (tagRaces != null && tagRaces.Count > 0)
-                {
-                    var codes = CardDatabaseService.TagRacesToCodes(tagRaces);
-                    if (codes.Count > 0)
-                    {
-                        Log($"本局种族: {string.Join(", ", codes.Select(c => CardDatabaseService.GetRaceChinese(c)))}");
-                        OnAvailableRacesChanged?.Invoke(codes);
-                        return true;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Log($"读取种族失败(重试{retry + 1}/3): {ex.Message}");
-            }
-            if (retry < 2) Thread.Sleep(500);
-        }
-        Log("无法获取本局种族信息");
-        return false;
-    }
-
     private int _fetchFailCount;
 
     private void TryFetchPlayerInfo()
@@ -1608,7 +886,6 @@ public class GameMonitorService : IDisposable
             {
                 _localPlayerHi = acc.Hi;
                 _localPlayerLo = acc.Lo;
-                HeadToHeadStore.Init(_localPlayerLo);
                 Log($"AccountId.Hi: {_localPlayerHi}, Lo: {_localPlayerLo}");
             }
         }
@@ -1707,7 +984,6 @@ public class GameMonitorService : IDisposable
         {
             _running = false;
             _disposed = true;
-            _plugins?.Dispose();
         }
     }
 }
