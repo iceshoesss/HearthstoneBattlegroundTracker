@@ -65,6 +65,11 @@ public class GameMonitorService : IDisposable
     private string _logPath = "";
     private bool _disposed;
 
+    // teamId → Lo 映射（用于 update-placement 匹配）
+    private readonly Dictionary<int, ulong> _teamIdToLo = new();
+    // playerId → Lo 映射（从大厅 m_playerMap 构建，用于匹配排行榜）
+    private Dictionary<int, ulong> _playerIdToLo = new();
+
     // 场景状态（仅用于 UI 显示和辅助判断）
     private int _lastSceneMode = SceneMode.INVALID;
 
@@ -496,6 +501,14 @@ public class GameMonitorService : IDisposable
 
         _currentGame.LobbyPlayers = players;
 
+        // 保存 playerId → Lo 映射（从 m_playerMap 构建，用于匹配排行榜）
+        _playerIdToLo = lobbyInfo.PlayerIdToLo ?? new Dictionary<int, ulong>();
+        Console.WriteLine($"[Mapping] playerId→Lo: {_playerIdToLo.Count} entries");
+
+        // 构建 teamId → Lo 映射（延迟到首次获取排名时构建）
+        // 此时 LobbyPlayers 已就绪，等 GetPlayerRankings() 返回后再匹配
+        _teamIdToLo.Clear();
+
         // 从大厅数据设置英雄信息（BGSpy 优先于 Parser 的 HERO_ENTITY 匹配）
         {
             var me = players.FirstOrDefault(p =>
@@ -661,24 +674,45 @@ public class GameMonitorService : IDisposable
             OnMmrChanged?.Invoke(rc.NewRating);
         }
 
-        // ── 计算 otherPlacements（所有对局共用）──
-        var otherPlacements = new List<(ulong lo, int placement)>();
-
-        // 从 AllHeroes 读取（Power.log 解析的数据）
-        foreach (var hero in _currentGame.AllHeroes.Values)
-        {
-            if (hero.Placement > placement)
-            {
-                var matched = _currentGame.LobbyPlayers.FirstOrDefault(lp =>
-                    string.Equals(lp.HeroCardId, hero.CardId, StringComparison.OrdinalIgnoreCase));
-                if (matched != null && matched.Lo != 0 && matched.Lo != _localPlayerLo)
-                    otherPlacements.Add((matched.Lo, hero.Placement));
-            }
-        }
-
         // ── update-placement（仅联赛对局）──
         if (_league.IsLeagueGame && !string.IsNullOrEmpty(_currentGameUuid))
         {
+            var otherPlacements = new List<(ulong lo, int placement)>();
+
+            // 从内存读取实时排名
+            var rankings = _hm.GetPlayerRankings();
+            if (rankings.Count > 0)
+            {
+                // 构建 teamId → Lo 映射（如果还没构建）
+                if (_teamIdToLo.Count == 0)
+                    BuildTeamIdToLoMapping(rankings);
+
+                foreach (var (heroCardId, rank, isDead, teamId, playerId) in rankings)
+                {
+                    // 排名比自己低的玩家
+                    if (rank > placement)
+                    {
+                        // 用 teamId 查找 Lo
+                        if (_teamIdToLo.TryGetValue(teamId, out var lo) && lo != 0 && lo != _localPlayerLo)
+                            otherPlacements.Add((lo, rank));
+                    }
+                }
+            }
+            else
+            {
+                // 备用方案：从 AllHeroes 读取（Power.log 解析的数据）
+                foreach (var hero in _currentGame.AllHeroes.Values)
+                {
+                    if (hero.Placement > placement)
+                    {
+                        var matched = _currentGame.LobbyPlayers.FirstOrDefault(lp =>
+                            string.Equals(lp.HeroCardId, hero.CardId, StringComparison.OrdinalIgnoreCase));
+                        if (matched != null && matched.Lo != 0 && matched.Lo != _localPlayerLo)
+                            otherPlacements.Add((matched.Lo, hero.Placement));
+                    }
+                }
+            }
+
             for (int attempt = 0; attempt < 3; attempt++)
             {
                 var ok = ApiClient.UpdatePlacementAsync(_currentGameUuid, _localPlayerBattleTag,
@@ -735,6 +769,36 @@ public class GameMonitorService : IDisposable
             Thread.Sleep(500);
         }
         return null;
+    }
+
+    /// <summary>构建 teamId → Lo 映射（优先用 playerId，fallback 到 heroCardId）</summary>
+    private void BuildTeamIdToLoMapping(List<(string heroCardId, int placement, bool isDead, int teamId, int playerId)> rankings)
+    {
+        _teamIdToLo.Clear();
+        foreach (var (heroCardId, _, _, teamId, playerId) in rankings)
+        {
+            ulong lo = 0;
+
+            // 优先用 playerId 匹配（不受英雄重复影响）
+            if (playerId != 0 && _playerIdToLo.TryGetValue(playerId, out var mappedLo) && mappedLo != 0)
+            {
+                lo = mappedLo;
+            }
+            else
+            {
+                // fallback: 用 heroCardId 匹配 LobbyPlayers
+                var matched = _currentGame.LobbyPlayers.FirstOrDefault(lp =>
+                    string.Equals(lp.HeroCardId, heroCardId, StringComparison.OrdinalIgnoreCase));
+                if (matched != null && matched.Lo != 0)
+                    lo = matched.Lo;
+            }
+
+            if (lo != 0)
+            {
+                _teamIdToLo[teamId] = lo;
+                Console.WriteLine($"[Mapping] teamId={teamId} → Lo={lo} (playerId={playerId}, hero={heroCardId})");
+            }
+        }
     }
 
     // ═══════════════════════════════════════
