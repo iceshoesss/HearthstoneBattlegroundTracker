@@ -1,0 +1,104 @@
+<UserControl x:Class="HBT.Windows.CardBrowserPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:HBT.Windows">
+    <UserControl.Resources>
+        <Style x:Key="FilterBtn" TargetType="Button">
+            <Setter Property="Background" Value="#1e293b"/>
+            <Setter Property="Foreground" Value="#94a3b8"/>
+            <Setter Property="BorderBrush" Value="#334155"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="8,3"/>
+            <Setter Property="Margin" Value="0,0,3,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#334155"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="FilterBtnActive" TargetType="Button" BasedOn="{StaticResource FilterBtn}">
+            <Setter Property="Background" Value="#1e3a5f"/>
+            <Setter Property="Foreground" Value="#60a5fa"/>
+            <Setter Property="BorderBrush" Value="#3b82f6"/>
+        </Style>
+    </UserControl.Resources>
+    <Border Background="#CC1e293b" BorderBrush="#334155" BorderThickness="1"
+            CornerRadius="6" Padding="10,8" Width="260">
+        <StackPanel>
+            <Grid Margin="0,0,0,4">
+                <Button Content="✕" HorizontalAlignment="Right" Background="Transparent"
+                        Foreground="#94a3b8" BorderThickness="0" Cursor="Hand" Padding="4,0"
+                        Click="CloseBtn_Click"/>
+            </Grid>
+            <StackPanel Margin="0,0,0,4">
+                <WrapPanel Margin="0,0,0,3">
+                    <Button Content="1" Tag="1" Click="TierFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="2" Tag="2" Click="TierFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="3" Tag="3" Click="TierFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="4" Tag="4" Click="TierFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="5" Tag="5" Click="TierFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="6" Tag="6" Click="TierFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="7" Tag="7" Click="TierFilter_Click" Style="{StaticResource FilterBtn}"/>
+                </WrapPanel>
+                <Border Height="1" Background="#334155" Margin="0,0,0,3"/>
+                <WrapPanel x:Name="RaceRow" Margin="0,0,0,3"/>
+                <Border Height="1" Background="#334155" Margin="0,0,0,3"/>
+                <WrapPanel x:Name="KeywordRow1" Margin="0,0,0,1">
+                    <Button Content="战吼" Tag="战吼" Click="KeywordFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="亡语" Tag="亡语" Click="KeywordFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="复生" Tag="复生" Click="KeywordFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="圣盾" Tag="圣盾" Click="KeywordFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="回合开始" Tag="回合开始" Click="KeywordFilter_Click" Style="{StaticResource FilterBtn}"/>
+                </WrapPanel>
+                <WrapPanel x:Name="KeywordRow2" Margin="0,0,0,3">
+                    <Button Content="烈毒" Tag="烈毒" Click="KeywordFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="风怒" Tag="风怒" Click="KeywordFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="嘲讽" Tag="嘲讽" Click="KeywordFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="光环" Tag="光环" Click="KeywordFilter_Click" Style="{StaticResource FilterBtn}"/>
+                    <Button Content="回合结束" Tag="回合结束" Click="KeywordFilter_Click" Style="{StaticResource FilterBtn}"/>
+                </WrapPanel>
+                <Border Height="1" Background="#334155" Margin="0,0,0,3"/>
+            </StackPanel>
+            <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="CardList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Width="250" CornerRadius="4" Margin="0,0,2,2" ClipToBounds="True"
+                                    BorderBrush="#334155" BorderThickness="1">
+                                <Grid>
+                                    <Image Source="{Binding Image, NotifyOnTargetUpdated=True}"
+                                           Stretch="UniformToFill" HorizontalAlignment="Right"
+                                           RenderOptions.BitmapScalingMode="HighQuality">
+                                        <Image.RenderTransform>
+                                            <ScaleTransform ScaleX="1.25" ScaleY="1.25" CenterX="125"/>
+                                        </Image.RenderTransform>
+                                    </Image>
+                                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="Bold"
+                                               Foreground="White" VerticalAlignment="Bottom"
+                                               HorizontalAlignment="Left" Margin="6,0,0,4">
+                                        <TextBlock.Effect>
+                                            <DropShadowEffect Color="Black" BlurRadius="4" ShadowDepth="1" Opacity="0.8"/>
+                                        </TextBlock.Effect>
+                                    </TextBlock>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </StackPanel>
+    </Border>
+</UserControl>

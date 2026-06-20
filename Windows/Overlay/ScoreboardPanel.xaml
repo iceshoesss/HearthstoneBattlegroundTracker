@@ -1,0 +1,112 @@
+<UserControl x:Class="HBT.Windows.ScoreboardPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border x:Name="ScoreBorder" Background="#CC1e293b" BorderBrush="#334155" BorderThickness="1"
+            CornerRadius="6" Padding="10,6" MinWidth="200"
+            MouseLeftButtonDown="ScoreBorder_MouseLeftButtonDown"
+            MouseLeftButtonUp="ScoreBorder_MouseLeftButtonUp" MouseMove="ScoreBorder_MouseMove">
+        <StackPanel>
+            <!-- Header: gear/confirm -->
+            <Grid Margin="0,0,0,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button x:Name="SettingsBtn" Grid.Column="1" Cursor="Hand" Padding="0"
+                        Click="SettingsBtn_Click"
+                        Background="Transparent" BorderBrush="Transparent" BorderThickness="0">
+                    <Border x:Name="SettingsBorder" Background="Transparent" CornerRadius="3" Padding="2,0">
+                        <Grid>
+                            <Viewbox x:Name="GearIcon" Width="14" Height="14">
+                                <Canvas Width="24" Height="24">
+                                    <Path Stroke="#64748b" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                          Data="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.559.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z"/>
+                                    <Path Stroke="#64748b" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                          Data="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
+                                </Canvas>
+                            </Viewbox>
+                            <Border x:Name="ConfirmBtn" Background="#4ade80" CornerRadius="4" Padding="6,2"
+                                     Visibility="Collapsed">
+                                <TextBlock Text="确认" Foreground="#1a1a2e" FontSize="10" FontWeight="Bold"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Button>
+            </Grid>
+            <!-- Settings panel -->
+            <StackPanel x:Name="SettingsPanel" Visibility="Collapsed" Margin="0,0,0,6">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="缩放" FontSize="9" Foreground="#64748b" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <Slider Grid.Column="1" x:Name="ScaleSlider" Minimum="1" Maximum="3" Value="1.2"
+                            TickFrequency="0.1" IsSnapToTickEnabled="True" ValueChanged="ScaleSlider_ValueChanged"/>
+                </Grid>
+                <TextBlock x:Name="ScaleText" Text="1.2x" FontSize="8" Foreground="#64748b" HorizontalAlignment="Right"/>
+            </StackPanel>
+            <!-- MMR -->
+            <Grid Margin="0,0,0,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                    <TextBlock Text="开始" FontSize="8" Foreground="#64748b" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="StartMmrText" Text="-" FontSize="14" FontWeight="Bold" Foreground="#e2e8f0" HorizontalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                    <TextBlock Text="当前" FontSize="8" Foreground="#64748b" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="CurrentMmrText" Text="-" FontSize="14" FontWeight="Bold" Foreground="#e2e8f0" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+            <Border Height="1" Background="#334155" Margin="0,0,0,4"/>
+            <!-- Games List -->
+            <ItemsControl x:Name="GamesList" MaxHeight="300"
+                          MouseMove="GamesList_MouseMove" MouseLeave="GamesList_MouseLeave">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,0,0,2" Height="26">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="22"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="20"/>
+                                <ColumnDefinition Width="36"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Width="22" Height="22" CornerRadius="4" ClipToBounds="True"
+                                    BorderBrush="#334155" BorderThickness="1" VerticalAlignment="Center">
+                                <Rectangle>
+                                    <Rectangle.Fill>
+                                        <ImageBrush ImageSource="{Binding HeroImage}" Stretch="UniformToFill">
+                                            <ImageBrush.Transform>
+                                                <ScaleTransform ScaleX="1.2" ScaleY="1.2" CenterX="0.4" CenterY="0.5"/>
+                                            </ImageBrush.Transform>
+                                        </ImageBrush>
+                                    </Rectangle.Fill>
+                                </Rectangle>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding HeroName}" FontSize="10" Foreground="#e2e8f0"
+                                       VerticalAlignment="Center" Margin="4,0,0,0" TextTrimming="CharacterEllipsis"/>
+                            <Border Grid.Column="2" Background="{Binding PlacementBrush}" Width="22" Height="14" CornerRadius="3"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding PlacementText}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           FontSize="9" FontWeight="Bold" Foreground="#1a1a2e"/>
+                            </Border>
+                            <TextBlock Grid.Column="3" Text="{Binding MMRDeltaText}" FontSize="9" FontWeight="Bold"
+                                       Foreground="{Binding MMRDeltaBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <!-- Board State Popup -->
+            <Popup x:Name="BoardStatePopup" IsOpen="False" Placement="Right" AllowsTransparency="True"
+                   PlacementTarget="{Binding ElementName=GamesList}" HorizontalOffset="8">
+                <Border Background="#1e293b" BorderBrush="#475569" BorderThickness="1" CornerRadius="6" Padding="6,10"
+                        MaxWidth="480">
+                    <StackPanel x:Name="BoardStatePanel" Orientation="Horizontal"/>
+                </Border>
+            </Popup>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -1,0 +1,24 @@
+<UserControl x:Class="HBT.Windows.OpponentBoardPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Background="#CC1e293b" BorderBrush="#334155" BorderThickness="1"
+            CornerRadius="6" Padding="12,8" MinWidth="250" MinHeight="80">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <WrapPanel x:Name="BoardPanel" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <Grid Grid.Row="1" Margin="0,4,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="InfoText" Text="" FontSize="14" Foreground="#94a3b8"
+                           HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
+                <TextBlock x:Name="HeadToHeadText" Text="" FontSize="14" Foreground="#94a3b8"
+                           HorizontalAlignment="Right" VerticalAlignment="Bottom" Grid.Column="1"/>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>
