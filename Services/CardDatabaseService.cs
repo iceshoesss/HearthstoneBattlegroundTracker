@@ -144,17 +144,17 @@ public class CardDatabaseService
     {
         EnsureLoaded();
         if (string.IsNullOrWhiteSpace(query))
-            return Cards.Minions.Where(m => !m.IsDuosOnly && !m.IsToken && !m.IsBuddy).ToList();
+            return Cards.Minions.Where(m => !m.IsDuosOnly && !m.IsToken && !m.IsBuddy && !m.IsTimewarped).ToList();
 
         return Cards.Search(query)
-            .Where(m => m.IsMinion && !m.IsDuosOnly && !m.IsToken && !m.IsBuddy)
+            .Where(m => m.IsMinion && !m.IsDuosOnly && !m.IsToken && !m.IsBuddy && !m.IsTimewarped)
             .ToList();
     }
 
     public List<BgdbCard> SearchMinions(string? query, string? race, int? tier)
     {
         EnsureLoaded();
-        IEnumerable<BgdbCard> result = Cards.Minions.Where(m => !m.IsDuosOnly && !m.IsToken && !m.IsBuddy);
+        IEnumerable<BgdbCard> result = Cards.Minions.Where(m => !m.IsDuosOnly && !m.IsToken && !m.IsBuddy && !m.IsTimewarped);
 
         if (!string.IsNullOrWhiteSpace(query))
             result = result.Where(m =>
