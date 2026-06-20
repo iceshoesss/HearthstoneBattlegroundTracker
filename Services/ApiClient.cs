@@ -191,7 +191,7 @@ public static class ApiClient
                 Console.WriteLine($"[API] ✅ 服务端 gameUuid: {ServerGameUuid}");
             }
 
-            var isLeague = json.Contains("\"isLeague\"") && json.Contains("true");
+            var isLeague = ExtractJsonBool(json, "isLeague");
             if (isLeague)
             {
                 Console.WriteLine("[API] 联赛对局已匹配");
@@ -395,7 +395,7 @@ public static class ApiClient
                 Console.WriteLine($"[API] ✅ 服务端 gameUuid: {ServerGameUuid}");
             }
 
-            var isLeague = json.Contains("\"isLeague\"") && json.Contains("true");
+            var isLeague = ExtractJsonBool(json, "isLeague");
             if (isLeague)
                 Console.WriteLine("[API] 联赛对局已匹配");
             else

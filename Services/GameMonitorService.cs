@@ -63,7 +63,6 @@ public class GameMonitorService : IDisposable
     private bool _playerNameReported;
     private bool _hmReady;
     private bool _racesFetched;
-    private bool _scanning;
     private int _lastKnownMmr;
     private int _startMmr;
     private int _hsPid;
@@ -78,6 +77,9 @@ public class GameMonitorService : IDisposable
     private Thread _logThread;
     private Thread _hoverThread;
     private volatile bool _running;
+
+    // 游戏状态锁
+    private readonly object _gameLock = new object();
 
     // 悬停状态
     private string _lastHoveredHeroCardId = "";
@@ -319,7 +321,7 @@ public class GameMonitorService : IDisposable
                                                 // 只让 Parser 填充 EntityTracker，不触发游戏事件
                                                 var (_, newState, newGame) = Parser.ProcessLine(line, _currentGame, _gameState, _games, _entityTracker);
                                                 _gameState = newState;
-                                                _currentGame = newGame;
+                                                lock (_gameLock) { _currentGame = newGame; }
                                             }
                                             Log($"EntityTracker: {_entityTracker.Entities.Count} 个实体");
                                         }
@@ -387,7 +389,7 @@ public class GameMonitorService : IDisposable
 
                     var (evt, newState, newGame) = Parser.ProcessLine(line, _currentGame, _gameState, _games, _entityTracker);
                     _gameState = newState;
-                    _currentGame = newGame;
+                    lock (_gameLock) { _currentGame = newGame; }
 
                     if (evt != null)
                         HandleParserEvent(evt);
@@ -412,9 +414,6 @@ public class GameMonitorService : IDisposable
 
     private void HandleParserEvent(GameEvent evt)
     {
-        // 扫描模式：只更新 Parser 状态，不触发 UI 和 API
-        if (_scanning) return;
-
         switch (evt)
         {
             case GameStartEvent:
@@ -758,7 +757,9 @@ public class GameMonitorService : IDisposable
                             opponentLo = mappedLo;
                         else if (heroCardId != null)
                         {
-                            var matched = _currentGame.LobbyPlayers.FirstOrDefault(lp =>
+                            List<LobbyPlayer> players;
+                            lock (_gameLock) { players = _currentGame.LobbyPlayers.ToList(); }
+                            var matched = players.FirstOrDefault(lp =>
                                 string.Equals(lp.HeroCardId, heroCardId, StringComparison.OrdinalIgnoreCase));
                             if (matched != null) opponentLo = matched.Lo;
                         }
@@ -1164,7 +1165,7 @@ public class GameMonitorService : IDisposable
 
         Log($"兜底结束 - {heroName}");
 
-        // 保存简化记录（排名=0，分数=0）
+        // 仅通知 UI 更新计分板（不保存到 GameStore，避免 Placement=0 污染统计数据）
         var record = new GameRecord
         {
             BattleTag = _localPlayerBattleTag,
@@ -1179,9 +1180,7 @@ public class GameMonitorService : IDisposable
             Mode = _config.Mode,
             Timestamp = DateTime.UtcNow.ToString("o"),
         };
-        GameStore.Save(record);
 
-        // 通知 UI 更新计分板
         OnGameEnded?.Invoke(record);
 
         // 重置状态
@@ -1670,7 +1669,7 @@ public class GameMonitorService : IDisposable
     private void ResetToIdle()
     {
         _phase = GamePhase.Idle;
-        _currentGame = new Game();
+        lock (_gameLock) { _currentGame = new Game(); }
         _gameState = new GameState();
         _games.Clear();
         _currentGameUuid = "";

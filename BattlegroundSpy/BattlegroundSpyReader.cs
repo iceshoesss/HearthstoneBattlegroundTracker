@@ -356,8 +356,8 @@ public sealed class BattlegroundSpyReader : IDisposable
                     if (gameAccountId != null)
                     {
                         ulong lo = 0, hi = 0;
-                        try { lo = (ulong)(int)(gameAccountId["low_"] ?? 0); } catch { }
-                        try { hi = (ulong)(int)(gameAccountId["high_"] ?? 0); } catch { }
+                        try { lo = Convert.ToUInt64(gameAccountId["low_"] ?? 0); } catch { }
+                        try { hi = Convert.ToUInt64(gameAccountId["high_"] ?? 0); } catch { }
 
                         // fallback: 尝试 <EntityId>k__BackingField
                         if (lo == 0)
@@ -367,8 +367,8 @@ public sealed class BattlegroundSpyReader : IDisposable
                                 var entityId = gameAccountId["<EntityId>k__BackingField"];
                                 if (entityId != null)
                                 {
-                                    lo = (ulong)(int)(entityId["low_"] ?? 0);
-                                    hi = (ulong)(int)(entityId["high_"] ?? 0);
+                                    lo = Convert.ToUInt64(entityId["low_"] ?? 0);
+                                    hi = Convert.ToUInt64(entityId["high_"] ?? 0);
                                 }
                             }
                             catch { }
@@ -421,14 +421,14 @@ public sealed class BattlegroundSpyReader : IDisposable
                                 if (gameAccountId != null)
                                 {
                                     ulong lo = 0;
-                                    try { lo = (ulong)(int)(gameAccountId["low_"] ?? 0); } catch { }
+                                    try { lo = Convert.ToUInt64(gameAccountId["low_"] ?? 0); } catch { }
                                     if (lo == 0)
                                     {
                                         try
                                         {
                                             var entityId = gameAccountId["<EntityId>k__BackingField"];
                                             if (entityId != null)
-                                                lo = (ulong)(int)(entityId["low_"] ?? 0);
+                                                lo = Convert.ToUInt64(entityId["low_"] ?? 0);
                                         }
                                         catch { }
                                     }
