@@ -95,7 +95,7 @@
                                         <Grid ClipToBounds="True">
                                             <Image Source="{Binding Image, NotifyOnTargetUpdated=True}"
                                                    Stretch="UniformToFill" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                                   Margin="0,0,-10,0"
+                                                   Margin="-38,0,-10,0"
                                                    RenderOptions.BitmapScalingMode="Fant"/>
                                         </Grid>
                                     </Grid>
