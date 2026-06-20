@@ -813,13 +813,26 @@ public class GameMonitorService : IDisposable
             // 等待一小段时间让 EntityTracker 收集当前战斗的数据
             Thread.Sleep(100);
 
-            // 从 EntityTracker 获取对手随从（ZONE=PLAY, CARDTYPE=MINION, CONTROLLER≠本地）
             var localController = _hm.GetLocalControllerIdPublic();
             if (localController == null)
             {
+                Log("localController=null，跳过捕获");
                 return;
             }
+
+            // 从 EntityTracker 获取对手随从（ZONE=PLAY, CARDTYPE=MINION, CONTROLLER≠本地）
             var opponentMinions = _entityTracker.GetOpponentMinions(localController.Value);
+
+            // 去重：同一 (cardId, zonePosition) 只保留 entityId 最大的（最新实体）
+            // 解决战斗场景切换时旧实体未清理导致的重复问题
+            var deduped = opponentMinions
+                .GroupBy(m => $"{m.CardId}_{m.ZonePosition}")
+                .Select(g => g.OrderByDescending(m => m.EntityId).First())
+                .OrderBy(m => m.ZonePosition)
+                .ToList();
+
+            if (deduped.Count < opponentMinions.Count)
+                Log($"[诊断] 去重: {opponentMinions.Count} → {deduped.Count} 个随从");
 
             // 用 BGSpy 获取对手英雄 cardId
             var boardState = _hm.GetOpponentBoardState();
@@ -841,11 +854,11 @@ public class GameMonitorService : IDisposable
                 }
             }
 
-            Log($"英雄: {heroCardId}, playerId={playerId}");
+            Log($"英雄: {heroCardId}, playerId={playerId}, 随从={deduped.Count}");
 
             // 转换为字典格式（即使为空也要保存，表示遇到过该对手）
             var boardDicts = new List<Dictionary<string, object>>();
-            foreach (var minion in opponentMinions)
+            foreach (var minion in deduped.Take(7))
             {
                 boardDicts.Add(new Dictionary<string, object>
                 {
@@ -893,11 +906,12 @@ public class GameMonitorService : IDisposable
                 Log($"PlayerId=0, 跳过缓存存储 ({heroCardId})");
             }
 
-            // 捕获完成后，清除对手随从残留（防止下次战斗累积）
-            _entityTracker.ClearStaleEntities(localController.Value);
+            // 清理 EntityTracker 残留（防止下次战斗累积）
+            var cleared = _entityTracker.ClearStaleEntities(localController.Value);
+            Log($"[诊断] ClearStaleEntities 清除了 {cleared} 个实体，剩余 {_entityTracker.Entities.Count} 个");
 
             // ── 触发战斗模拟 ──
-            RunCombatSimulation(opponentMinions, heroCardId);
+            RunCombatSimulation(deduped, heroCardId);
         }
         catch (Exception ex)
         {
@@ -1007,6 +1021,7 @@ public class GameMonitorService : IDisposable
             }
 
             var heroCardId = boardState.HeroCardId ?? "";
+            Log($"[诊断] BGSpy 快照: hero={heroCardId}, minions={boardState.BoardCards.Count}");
 
             // 优先从 ZONE_PLAY 英雄实体直接读取 PLAYER_ID（畸变时也能正确识别）
             int playerId = _hm.GetOpponentPlayerIdInPlay();

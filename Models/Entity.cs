@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace HBT
 {
@@ -93,9 +94,39 @@ public class EntityTracker
         return result;
     }
 
+    /// <summary>诊断：统计 EntityTracker 中各类型实体数量</summary>
+    public string Diagnose(int localControllerId)
+    {
+        int total = _entities.Count;
+        int heroes = 0, minions = 0, others = 0;
+        int inPlay = 0, inGraveyard = 0, inOtherZone = 0;
+        var controllerCounts = new Dictionary<int, int>();
+
+        foreach (var entity in _entities.Values)
+        {
+            if (entity.IsHero) heroes++;
+            else if (entity.IsMinion) minions++;
+            else others++;
+
+            if (entity.Zone == 1) inPlay++;
+            else if (entity.Zone == 4) inGraveyard++;
+            else inOtherZone++;
+
+            if (entity.IsMinion && entity.IsInPlay)
+            {
+                var c = entity.Controller;
+                if (!controllerCounts.ContainsKey(c)) controllerCounts[c] = 0;
+                controllerCounts[c]++;
+            }
+        }
+
+        var controllerInfo = string.Join(", ", controllerCounts.Select(kv => $"C{kv.Key}={kv.Value}"));
+        return $"[EntityTracker] 总={total} 英雄={heroes} 随从={minions} 其他={others} | PLAY={inPlay} GRAVEYARD={inGraveyard} 其他区域={inOtherZone} | PLAY随从按Controller: [{controllerInfo}] 本地={localControllerId}";
+    }
+
     /// <summary>清除残留实体：非 PLAY 区域 + 对手的 PLAY 随从
     /// 保留英雄实体（用于 PLAYER_ID 查找）</summary>
-    public void ClearStaleEntities(int localControllerId = 0)
+    public int ClearStaleEntities(int localControllerId = 0)
     {
         var toRemove = new List<int>();
         foreach (var kvp in _entities)
@@ -118,6 +149,7 @@ public class EntityTracker
         {
             _entities.Remove(id);
         }
+        return toRemove.Count;
     }
 
     /// <summary>获取对手英雄（CARDTYPE=HERO, CONTROLLER≠本地玩家, 非GRAVEYARD）</summary>
