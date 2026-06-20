@@ -129,6 +129,7 @@ public partial class MainWindow : Window
                 _overlay?.ForceShow();
                 _overlay?.ShowScoreboard();
                 _overlay?.HideGameToolsPanel();
+                _overlay?.HideCardBrowser();
                 _overlay?.LoadScoreRecentGames(_monitor.GetRecentGames(9));
                 var startMmr = GameStore.GetTodayStartMmr(_monitor.PlayerName);
                 if (startMmr > 0) _overlay?.UpdateScoreStartMmr(startMmr);
@@ -145,6 +146,7 @@ public partial class MainWindow : Window
                     // 15→4 或 0/-1→4（断线重连），一定是战棋
                     _overlay?.ShowScoreboard();
                     _overlay?.ShowGameToolsPanel();
+                    _overlay?.ShowCardBrowser();
                     _overlay?.LoadScoreRecentGames(_monitor.GetRecentGames(9));
                     var startMmr = GameStore.GetTodayStartMmr(_monitor.PlayerName);
                     if (startMmr > 0) _overlay?.UpdateScoreStartMmr(startMmr);
@@ -161,6 +163,7 @@ public partial class MainWindow : Window
                             {
                                 _overlay?.ShowScoreboard();
                                 _overlay?.ShowGameToolsPanel();
+                                _overlay?.ShowCardBrowser();
                                 _overlay?.LoadScoreRecentGames(_monitor.GetRecentGames(9));
                                 var startMmr = GameStore.GetTodayStartMmr(_monitor.PlayerName);
                                 if (startMmr > 0) _overlay?.UpdateScoreStartMmr(startMmr);
@@ -173,6 +176,7 @@ public partial class MainWindow : Window
             {
                 _overlay?.HideScoreboard();
                 _overlay?.HideGameToolsPanel();
+                _overlay?.HideCardBrowser();
             }
         });
 
