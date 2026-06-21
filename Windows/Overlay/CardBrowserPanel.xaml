@@ -35,7 +35,7 @@
             <Setter Property="BorderBrush" Value="#3b82f6"/>
         </Style>
     </UserControl.Resources>
-    <Border Background="#CC1e293b" BorderBrush="#334155" BorderThickness="1"
+    <Border x:Name="CardBrowserBorder" Background="#CC1e293b" BorderBrush="#334155" BorderThickness="1"
             CornerRadius="6" Padding="10,8" Width="260">
         <StackPanel>
             <Grid Margin="0,0,0,4">
@@ -73,7 +73,8 @@
                 <Border Height="1" Background="#334155" Margin="0,0,0,3"/>
             </StackPanel>
             <ScrollViewer MaxHeight="400" VerticalScrollBarVisibility="Auto">
-                <ItemsControl x:Name="CardList">
+                <ItemsControl x:Name="CardList"
+                              MouseMove="CardList_MouseMove" MouseLeave="CardList_MouseLeave">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Width="250" Height="40" CornerRadius="4" Margin="0,0,2,2" ClipToBounds="True"
@@ -115,6 +116,17 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
+            <!-- 卡牌预览 Popup（显示在查询器左侧，对齐鼠标高度） -->
+            <Popup x:Name="CardPreviewPopup" IsOpen="False" Placement="Left" AllowsTransparency="True"
+                   HorizontalOffset="-8" VerticalOffset="-90" StaysOpen="True"
+                   PlacementTarget="{Binding ElementName=CardBrowserBorder}">
+                <StackPanel Orientation="Horizontal" IsHitTestVisible="False">
+                    <Image x:Name="NormalCardImage" Width="180" Height="270" Margin="0,0,6,0"
+                           RenderOptions.BitmapScalingMode="Fant"/>
+                    <Image x:Name="GoldenCardImage" Width="180" Height="270"
+                           RenderOptions.BitmapScalingMode="Fant"/>
+                </StackPanel>
+            </Popup>
         </StackPanel>
     </Border>
 </UserControl>

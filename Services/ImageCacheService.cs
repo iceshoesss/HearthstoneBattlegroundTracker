@@ -51,6 +51,23 @@ public class ImageCacheService
         Placeholder = CreatePlaceholder();
     }
 
+    /// <summary>创建缓存服务实例（自定义 URL 和缓存目录）</summary>
+    public ImageCacheService(string baseUrl, string cacheKey, string extension = "png")
+    {
+        _baseUrl = baseUrl;
+        _extension = extension;
+        
+        _cacheDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "HearthstoneBattlegroundTracker", "Images", cacheKey);
+        Directory.CreateDirectory(_cacheDir);
+
+        _etagFile = Path.Combine(_cacheDir, "_etags.json");
+        LoadEtags();
+
+        Placeholder = CreatePlaceholder();
+    }
+
     /// <summary>同步获取已缓存图片，未缓存返回占位符并触发异步下载</summary>
     public BitmapImage GetTileOrPlaceholder(string cardId)
     {
