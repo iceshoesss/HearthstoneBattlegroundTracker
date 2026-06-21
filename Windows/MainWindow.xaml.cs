@@ -389,7 +389,8 @@ public class GameDisplayItem
 public class MinionDisplayItem : System.ComponentModel.INotifyPropertyChanged
 {
     private readonly BgdbCard _m;
-    public MinionDisplayItem(BgdbCard m) { _m = m; }
+    private readonly CardDatabaseService _cardDb;
+    public MinionDisplayItem(BgdbCard m, CardDatabaseService cardDb = null) { _m = m; _cardDb = cardDb; }
     public string CardId => _m.CardId ?? "";
     public string Name => _m.NameZh ?? _m.Name ?? "";
     public string NameEn => _m.Name ?? "";
@@ -398,6 +399,9 @@ public class MinionDisplayItem : System.ComponentModel.INotifyPropertyChanged
     public int Attack => _m.Attack;
     public int Health => _m.Health;
     public List<string> Keywords => CardDatabaseService.GetKeywords(_m);
+
+    /// <summary>金色版本的 CardId（通过 DbfIdGold 在 hearthstonejson 查找）</summary>
+    public string GoldenCardId => _cardDb?.GetGoldenCardId(_m.DbfIdGold) ?? CardId + "_G";
 
     private System.Windows.Media.Imaging.BitmapImage _image;
     public System.Windows.Media.Imaging.BitmapImage Image

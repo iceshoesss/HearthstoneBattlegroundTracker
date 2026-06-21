@@ -56,6 +56,11 @@
     <Content Include="icon.ico" CopyToOutputDirectory="PreserveNewest" Link="icon.ico" />
   </ItemGroup>
 
+  <!-- HearthstoneJSON data -->
+  <ItemGroup>
+    <Content Include="Data\cards.battlegrounds.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <!-- Tribe icons -->
   <ItemGroup>
     <Resource Include="Resources\TribeIcons\*.jpg" />

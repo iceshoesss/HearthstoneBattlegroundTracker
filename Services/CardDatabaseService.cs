@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using BattlegroundDB;
+using Newtonsoft.Json;
 
 namespace HBT.Services
 {
@@ -12,6 +14,7 @@ namespace HBT.Services
 public class CardDatabaseService
 {
     private bool _loaded;
+    private Dictionary<int, string> _dbfIdToCardId = new();
 
     public void EnsureLoaded()
     {
@@ -29,6 +32,47 @@ public class CardDatabaseService
         {
             System.Diagnostics.Debug.WriteLine($"CardDB load error: {ex}");
         }
+
+        try
+        {
+            LoadHearthstoneJsonIndex();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"HearthstoneJSON index load error: {ex}");
+        }
+    }
+
+    private void LoadHearthstoneJsonIndex()
+    {
+        var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "cards.battlegrounds.json");
+        if (!File.Exists(path)) return;
+
+        var json = File.ReadAllText(path);
+        var cards = JsonConvert.DeserializeObject<List<HsbgJsonCard>>(json);
+        if (cards == null) return;
+
+        _dbfIdToCardId = cards
+            .Where(c => c.DbfId > 0 && !string.IsNullOrEmpty(c.Id))
+            .GroupBy(c => c.DbfId)
+            .ToDictionary(g => g.Key, g => g.First().Id);
+
+        System.Diagnostics.Debug.WriteLine($"HearthstoneJSON index loaded: {_dbfIdToCardId.Count} entries");
+    }
+
+    /// <summary>通过 DbfId 获取金色版本的 CardId</summary>
+    public string GetGoldenCardId(int? dbfIdGold)
+    {
+        if (dbfIdGold == null) return null;
+        return _dbfIdToCardId.TryGetValue(dbfIdGold.Value, out var cardId) ? cardId : null;
+    }
+
+    private class HsbgJsonCard
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+        [JsonProperty("dbfId")]
+        public int DbfId { get; set; }
     }
 
     // === 查询 API ===

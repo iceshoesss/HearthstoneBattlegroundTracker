@@ -4,6 +4,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using BattlegroundDB;
 using HBT.Services;
 
@@ -13,7 +17,10 @@ public partial class CardBrowserPanel : UserControl
 {
     private readonly CardDatabaseService _cardDb;
     private readonly ImageCacheService _imgCache;
+    private readonly ImageCacheService _renderCache;      // 普通版/金色版 bgs
     private List<string> _availableRaces;
+    private readonly DispatcherTimer _previewTimer;
+    private MinionDisplayItem _pendingPreviewItem;
 
     private string _activeRace;
     private int? _activeTier;
@@ -26,6 +33,11 @@ public partial class CardBrowserPanel : UserControl
     {
         _cardDb = cardDb;
         _imgCache = imgCache;
+        _renderCache = new ImageCacheService(
+            "https://art.hearthstonejson.com/v1/bgs/latest/zhCN/512x",
+            "bgs_zhCN_512x", "png");
+        _previewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _previewTimer.Tick += PreviewTimer_Tick;
         InitializeComponent();
     }
 
@@ -123,7 +135,7 @@ public partial class CardBrowserPanel : UserControl
                 };
             }
 
-            var items = filtered.Select(m => new MinionDisplayItem(m)).ToList();
+            var items = filtered.Select(m => new MinionDisplayItem(m, _cardDb)).ToList();
             CardList.ItemsSource = items;
             _ = LoadCardImagesAsync(items);
         }
@@ -201,6 +213,78 @@ public partial class CardBrowserPanel : UserControl
         if (_activeKeyword == keyword) { _activeKeyword = null; }
         else { _activeKeyword = keyword; btn.Style = active; }
         ApplyFilters();
+    }
+
+    // === 悬浮预览（与计分板同模式） ===
+
+    private void CardList_MouseMove(object sender, MouseEventArgs e)
+    {
+        var item = FindDataContextUnderMouse<MinionDisplayItem>(CardList, e);
+        if (item == null)
+        {
+            _previewTimer.Stop();
+            CardPreviewPopup.IsOpen = false;
+            _pendingPreviewItem = null;
+            return;
+        }
+
+        if (item == _pendingPreviewItem && CardPreviewPopup.IsOpen)
+            return;
+
+        if (item != _pendingPreviewItem)
+        {
+            _previewTimer.Stop();
+            _pendingPreviewItem = item;
+            _previewTimer.Start();
+        }
+    }
+
+    private void CardList_MouseLeave(object sender, MouseEventArgs e)
+    {
+        _previewTimer.Stop();
+        _pendingPreviewItem = null;
+        CardPreviewPopup.IsOpen = false;
+    }
+
+    private void PreviewTimer_Tick(object sender, EventArgs e)
+    {
+        _previewTimer.Stop();
+        var item = _pendingPreviewItem;
+        if (item == null) return;
+
+        NormalCardImage.Source = _renderCache.GetTileOrPlaceholder(item.CardId);
+        GoldenCardImage.Source = _renderCache.GetTileOrPlaceholder(item.GoldenCardId + "_triple");
+        CardPreviewPopup.IsOpen = true;
+
+        _ = LoadCardPreviewAsync(item.CardId, item.GoldenCardId);
+    }
+
+    private async Task LoadCardPreviewAsync(string cardId, string goldenCardId)
+    {
+        try
+        {
+            var normalImg = await _renderCache.GetTileAsync(cardId);
+
+            // 金色版：普通 CardId + "_G" + "_triple" 后缀获取图片
+            var goldenImg = await _renderCache.GetTileAsync(goldenCardId + "_triple");
+
+            // 更新图片
+            NormalCardImage.Source = normalImg;
+            GoldenCardImage.Source = goldenImg;
+        }
+        catch { }
+    }
+
+    private static T FindDataContextUnderMouse<T>(ItemsControl itemsControl, MouseEventArgs e) where T : class
+    {
+        var hit = e.OriginalSource as DependencyObject;
+        while (hit != null)
+        {
+            if (hit is ContentPresenter cp && cp.DataContext is T data)
+                return data;
+            hit = VisualTreeHelper.GetParent(hit);
+        }
+        return null;
     }
 }
 }
