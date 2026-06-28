@@ -190,6 +190,10 @@ namespace HBTCombat
             int attackerAttack = attacker.GetEffectiveAttack(state);
             int targetAttack = target.GetEffectiveAttack(state);
 
+            // 记录毒/烈毒状态（在伤害前，因为伤害可能杀死随从）
+            bool attackerHasPoison = (attacker.Poisonous || attacker.Venomous) && attackerAttack > 0;
+            bool targetHasPoison = (target.Poisonous || target.Venomous) && targetAttack > 0;
+
             // 攻击者对目标造成伤害
             target.TakeDamage(attackerAttack);
 
@@ -199,17 +203,15 @@ namespace HBTCombat
                 attacker.TakeDamage(targetAttack);
             }
 
-            // 毒/烈毒：对目标生效
-            if (attacker.IsAlive && attackerAttack > 0)
+            // 毒/烈毒：对目标生效（只要攻击者有毒且造成了伤害）
+            if (attackerHasPoison)
             {
-                if (attacker.Poisonous || attacker.Venomous)
-                    target.CurrentHealth = 0;
+                target.CurrentHealth = 0;
             }
-            // 毒/烈毒：对攻击者生效（反击时）
-            if (target.IsAlive && targetAttack > 0)
+            // 毒/烈毒：对攻击者生效（只要目标有毒且造成了伤害）
+            if (targetHasPoison)
             {
-                if (target.Poisonous || target.Venomous)
-                    attacker.CurrentHealth = 0;
+                attacker.CurrentHealth = 0;
             }
 
             // 顺劈：对相邻随从造成伤害
