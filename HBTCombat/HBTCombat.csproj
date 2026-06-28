@@ -15,4 +15,11 @@
     <DebugType>none</DebugType>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Reference Include="BattlegroundDB">
+      <HintPath>..\Lib\BattlegroundDB.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
 </Project>
