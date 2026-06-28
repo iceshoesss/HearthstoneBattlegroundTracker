@@ -15,7 +15,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
-    <DefaultItemExcludes>$(DefaultItemExcludes);BattlegroundSpy\**;BattlegroundSpy.Test\**;HBTCombat\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);BattlegroundSpy\**;BattlegroundSpy.Test\**;HBTCombat\**;HBTCombat.Tests\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <!-- Release 不生成 .pdb -->
