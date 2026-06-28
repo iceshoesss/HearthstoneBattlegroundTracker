@@ -284,11 +284,17 @@ namespace HBTCombat
                 }
             }
 
-            // 触发亡语
+            // 触发亡语（召唤类）
             foreach (var dead in playerDead)
                 TriggerDeathrattle(dead, state.PlayerBoard, state);
             foreach (var dead in opponentDead)
                 TriggerDeathrattle(dead, state.OpponentBoard, state);
+
+            // 触发亡语效果类
+            foreach (var dead in playerDead)
+                TriggerDeathrattleEffect(dead, state);
+            foreach (var dead in opponentDead)
+                TriggerDeathrattleEffect(dead, state);
 
             // 触发复生
             foreach (var dead in playerDead)
@@ -329,6 +335,14 @@ namespace HBTCombat
                         }
                     }
                 }
+            }
+        }
+
+        private void TriggerDeathrattleEffect(Minion dead, CombatState state)
+        {
+            foreach (var effect in dead.DeathrattleEffects)
+            {
+                effect.Trigger(dead, state);
             }
         }
 

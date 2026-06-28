@@ -51,6 +51,9 @@ namespace HBTCombat
         private static readonly Dictionary<string, Func<Minion, bool, IRebornBehavior>> RebornBehaviorRegistry
             = new Dictionary<string, Func<Minion, bool, IRebornBehavior>>();
 
+        private static readonly Dictionary<string, Func<Minion, bool, List<IDeathrattleEffect>>> DeathrattleEffectRegistry
+            = new Dictionary<string, Func<Minion, bool, List<IDeathrattleEffect>>>();
+
         // === 注册行为的方法 ===
 
         public static void RegisterStartOfCombat(string cardId, Func<Minion, bool, List<IOnStartOfCombat>> factory)
@@ -96,6 +99,11 @@ namespace HBTCombat
         public static void RegisterRebornBehavior(string cardId, Func<Minion, bool, IRebornBehavior> factory)
         {
             RebornBehaviorRegistry[cardId] = factory;
+        }
+
+        public static void RegisterDeathrattleEffect(string cardId, Func<Minion, bool, List<IDeathrattleEffect>> factory)
+        {
+            DeathrattleEffectRegistry[cardId] = factory;
         }
 
         /// <summary>
@@ -222,6 +230,9 @@ namespace HBTCombat
 
             if (RebornBehaviorRegistry.TryGetValue(cardId, out var rbFactory))
                 minion.RebornBehavior = rbFactory(minion, controlledByPlayer);
+
+            if (DeathrattleEffectRegistry.TryGetValue(cardId, out var deFactory))
+                minion.DeathrattleEffects = deFactory(minion, controlledByPlayer);
 
             // 数据驱动行为：从 BattlegroundDB 的 Keywords 推断基础亡语
             if (card.HasKeyword("Deathrattle") && minion.Deathrattles.Count == 0)

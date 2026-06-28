@@ -47,6 +47,7 @@ namespace HBTCombat
 
         // === 行为接口列表 ===
         public List<IDeathrattle> Deathrattles { get; set; } = new List<IDeathrattle>();
+        public List<IDeathrattleEffect> DeathrattleEffects { get; set; } = new List<IDeathrattleEffect>();
         public List<IOnStartOfCombat> StartOfCombatTriggers { get; set; } = new List<IOnStartOfCombat>();
         public List<IOnAfterAttack> AfterAttackTriggers { get; set; } = new List<IOnAfterAttack>();
         public List<IOnFriendlyMinionDied> FriendlyMinionDiedTriggers { get; set; } = new List<IOnFriendlyMinionDied>();
@@ -162,6 +163,7 @@ namespace HBTCombat
 
             // 共享行为引用（不可变）
             clone.Deathrattles = Deathrattles;
+            clone.DeathrattleEffects = DeathrattleEffects;
             clone.StartOfCombatTriggers = StartOfCombatTriggers;
             clone.AfterAttackTriggers = AfterAttackTriggers;
             clone.FriendlyMinionDiedTriggers = FriendlyMinionDiedTriggers;
