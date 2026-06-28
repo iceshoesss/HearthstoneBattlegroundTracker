@@ -935,43 +935,43 @@ public class GameMonitorService : IDisposable
             int playerTier = playerMinions.Count > 0 ? playerMinions.Max(m => m.TechLevel) : 6;
             var input = new SimulationInput
             {
-                PlayerHealth = _lastKnownMmr > 0 ? 40 : 40,
+                PlayerHealth = 40,
                 OpponentHealth = 40,
                 PlayerTier = playerTier,
-                OpponentTier = 6, // 排行榜对手通常是高本
+                OpponentTier = 6,
                 Turn = GetActualTurn(_lastRawTurn),
                 DamageCap = _hm.GetDamageCap(),
             };
 
-            // 转换己方随从
+            // 初始化 MinionFactory 并注册行为
+            var factory = new MinionFactory();
+            MinionFactoryCache.SetFactory(factory);
+            MinionBehaviors.RegisterAll();
+
+            // 转换己方随从（使用 MinionFactory 创建带行为的 Minion）
             foreach (var m in playerMinions)
             {
-                var sim = SimMinion.Create(m.CardId, m.Attack, m.MaxHealth, m.TechLevel);
-                sim.Taunt = m.Taunt;
-                sim.DivineShield = m.DivineShield;
-                sim.Poisonous = m.Poisonous;
-                sim.Venomous = m.Venomous;
-                sim.Windfury = m.Windfury;
-                sim.Reborn = m.Reborn;
-                sim.Golden = m.Golden;
-                sim.Cleave = IsCleaveMinion(m.CardId);
-                // TODO: 亡语回调（后续实现）
-                input.PlayerBoard.Add(sim);
+                var minion = factory.CreateFromCardId(
+                    m.CardId, true,
+                    m.Attack, m.MaxHealth, m.MaxHealth,
+                    m.Taunt, m.DivineShield, m.Poisonous, m.Venomous,
+                    m.Windfury, false, false, m.Reborn,
+                    m.Golden, m.TechLevel
+                );
+                input.PlayerBoard.Add(minion);
             }
 
             // 转换对手随从
             foreach (var m in opponentMinions)
             {
-                var sim = SimMinion.Create(m.CardId, m.Attack, m.MaxHealth, m.TechLevel);
-                sim.Taunt = m.Taunt;
-                sim.DivineShield = m.DivineShield;
-                sim.Poisonous = m.Poisonous;
-                sim.Venomous = m.Venomous;
-                sim.Windfury = m.Windfury;
-                sim.Reborn = m.Reborn;
-                sim.Golden = m.Golden;
-                sim.Cleave = IsCleaveMinion(m.CardId);
-                input.OpponentBoard.Add(sim);
+                var minion = factory.CreateFromCardId(
+                    m.CardId, false,
+                    m.Attack, m.MaxHealth, m.MaxHealth,
+                    m.Taunt, m.DivineShield, m.Poisonous, m.Venomous,
+                    m.Windfury, false, false, m.Reborn,
+                    m.Golden, m.TechLevel
+                );
+                input.OpponentBoard.Add(minion);
             }
 
             Log($"[模拟] 开始模拟: 己方{input.PlayerBoard.Count}个 vs 对方{input.OpponentBoard.Count}个, DamageCap={input.DamageCap}");
@@ -979,7 +979,7 @@ public class GameMonitorService : IDisposable
             // 后台运行模拟
             Task.Run(() =>
             {
-                var result = SimulationRunner.Run(input, iterations: 2000, maxMs: 500);
+                var result = SimulationRunner.Run(input, iterations: 10000, maxMs: 1500);
                 Log($"[模拟] 完成: 胜{result.WinRate * 100:F0}% 平{result.TieRate * 100:F0}% 负{result.LossRate * 100:F0}% 我方{result.PlayerDamageMin}~{result.PlayerDamageMax} 对方{result.OpponentDamageMin}~{result.OpponentDamageMax}");
                 OnCombatSimulationResult?.Invoke(
                     result.WinRate, result.TieRate, result.LossRate,

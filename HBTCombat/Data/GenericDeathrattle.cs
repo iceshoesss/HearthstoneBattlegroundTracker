@@ -50,7 +50,7 @@ namespace HBTCombat
     /// <summary>
     /// MinionFactory 缓存（用于在亡语等回调中创建衍生物）
     /// </summary>
-    internal static class MinionFactoryCache
+    public static class MinionFactoryCache
     {
         private static MinionFactory _factory;
 
