@@ -5,11 +5,8 @@ using HBTCombat.Interfaces;
 namespace HBTCombat
 {
     /// <summary>
-    /// 随从行为注册中心
-    /// 集中注册所有有特殊行为的随从
-    ///
-    /// 注意：使用 BattlegroundDB 中的真实卡牌 ID
-    /// 数据驱动的亡语（有 ChildIds 的）会自动处理，这里只注册需要特殊逻辑的随从
+    /// 随从行为注册中心 - 全面覆盖版
+    /// 参考 BobBuddy 实现，覆盖所有当前在池的随从
     /// </summary>
     public static class MinionBehaviors
     {
@@ -18,62 +15,46 @@ namespace HBTCombat
         /// </summary>
         public static void RegisterAll()
         {
-            // === 亡语效果类（需要特殊逻辑）===
             RegisterDeathrattleEffects();
-
-            // === 友方死亡触发类 ===
             RegisterOnFriendlyMinionDied();
-
-            // === 战斗开始触发类 ===
             RegisterStartOfCombat();
-
-            // === 攻击后触发类 ===
             RegisterAfterAttack();
-
-            // === 友方召唤触发类 ===
             RegisterOnFriendlyMinionSummoned();
-
-            // === 复仇触发类 ===
             RegisterAvenge();
-
-            // === 被动加成类 ===
             RegisterPassiveBonuses();
-
-            // === 自定义亡语召唤（特殊逻辑）===
             RegisterSpecialDeathrattles();
+            RegisterTimewarpedMinions();
         }
 
         // ═══════════════════════════════════════════════════════════════
-        // 亡语效果类（非召唤）
+        // Tier 1 随从
         // ═══════════════════════════════════════════════════════════════
 
-        private static void RegisterDeathrattleEffects()
+        private static void RegisterTier1()
         {
-            // Goldrinn, the Great Wolf (T6): 给所有友方野兽 +8/+8
-            MinionFactory.RegisterDeathrattleEffect("BGS_018", (m, p) => new List<IDeathrattleEffect>
+            // Sneed's New Shredder (T1): summons highest-health minion from hand with Divine Shield
+            MinionFactory.RegisterDeathrattle("BG21_HERO_030t", (m, p) => new List<IDeathrattle>
             {
-                new GoldrinnDeathrattleEffect()
+                new SneedsNewShredderDeathrattle()
             });
 
-            // Scarlet Skull (T2): +1/+2 to a friendly Undead
-            MinionFactory.RegisterDeathrattleEffect("BG25_022", (m, p) => new List<IDeathrattleEffect>
+            // Twilight Hatchling (T1): summons a 3/3 that attacks immediately
+            MinionFactory.RegisterDeathrattle("BG34_630", (m, p) => new List<IDeathrattle>
             {
-                new ScarletSkullDeathrattleEffect()
+                new TwilightHatchlingDeathrattle()
             });
+        }
 
-            // Spiked Savior (T5): +1 health to all friendly minions AND deals 1 damage to each
-            // TODO: 需要实现
+        // ═══════════════════════════════════════════════════════════════
+        // Tier 2 随从
+        // ═══════════════════════════════════════════════════════════════
 
-            // Tunnel Blaster (T4): deals 3 damage to all minions
-            MinionFactory.RegisterDeathrattleEffect("BG_DAL_775", (m, p) => new List<IDeathrattleEffect>
+        private static void RegisterTier2()
+        {
+            // Alert Alarmist (T2): Deathrattle: Summon a 2/2 Mech with Taunt
+            MinionFactory.RegisterDeathrattle("BG35_340", (m, p) => new List<IDeathrattle>
             {
-                new TunnelBlasterDeathrattleEffect()
-            });
-
-            // Silent Enforcer (T4): deals 2 damage to all minions (except friendly demons)
-            MinionFactory.RegisterDeathrattleEffect("BG33_156", (m, p) => new List<IDeathrattleEffect>
-            {
-                new SilentEnforcerDeathrattleEffect()
+                new GenericDeathrattle(m.Golden, new List<string> { "BG35_340t" }, 1, 2)
             });
 
             // Baneling (T2): deals damage equal to its attack to a random enemy
@@ -82,24 +63,451 @@ namespace HBTCombat
                 new BanelingDeathrattleEffect()
             });
 
-            // Leeroy the Reckless (T5): destroys the minion that killed it
-            // TODO: 需要跟踪击杀者，暂时跳过
-
-            // Plaguerunner (T4): +1/+1 to a random friendly minion for each minion that died this combat
-            MinionFactory.RegisterDeathrattleEffect("BG34_690", (m, p) => new List<IDeathrattleEffect>
+            // Scarlet Skull (T2): +1/+2 to a friendly Undead
+            MinionFactory.RegisterDeathrattleEffect("BG25_022", (m, p) => new List<IDeathrattleEffect>
             {
-                new PlaguerunnerDeathrattleEffect()
+                new ScarletSkullDeathrattleEffect()
+            });
+
+            // Coldlight Diver (T2): Deathrattle: Give a friendly Murloc +2/+2
+            MinionFactory.RegisterDeathrattleEffect("BG33_894", (m, p) => new List<IDeathrattleEffect>
+            {
+                new ColdlightDiverDeathrattleEffect()
             });
         }
 
         // ═══════════════════════════════════════════════════════════════
-        // 友方死亡触发
+        // Tier 3 随从
         // ═══════════════════════════════════════════════════════════════
+
+        private static void RegisterTier3()
+        {
+            // Glowing Cinder (T3): Deathrattle: Deal 2 damage to a random enemy
+            MinionFactory.RegisterDeathrattleEffect("BG32_842", (m, p) => new List<IDeathrattleEffect>
+            {
+                new GlowingCinderDeathrattleEffect()
+            });
+
+            // Mummifier (T3): Deathrattle: Give a different friendly Undead Reborn
+            MinionFactory.RegisterDeathrattleEffect("BG28_309", (m, p) => new List<IDeathrattleEffect>
+            {
+                new MummifierDeathrattleEffect()
+            });
+
+            // Prickly Piper (T3): Deathrattle: Deal 1 damage to all enemies
+            MinionFactory.RegisterDeathrattleEffect("BG26_160", (m, p) => new List<IDeathrattleEffect>
+            {
+                new PricklyPiperDeathrattleEffect()
+            });
+
+            // Scourfin (T3): Deathrattle: Deal 4 damage to a random enemy
+            MinionFactory.RegisterDeathrattleEffect("BG26_360", (m, p) => new List<IDeathrattleEffect>
+            {
+                new ScourfinDeathrattleEffect()
+            });
+
+            // Sly Raptor (T3): summons a random beast with stats set to 6/6
+            MinionFactory.RegisterDeathrattle("BG25_806", (m, p) => new List<IDeathrattle>
+            {
+                new SlyRaptorDeathrattle()
+            });
+
+            // Handless Forsaken (T3): summons a 2/1 with Reborn
+            MinionFactory.RegisterDeathrattle("BG25_010", (m, p) => new List<IDeathrattle>
+            {
+                new HandlessForsakenDeathrattle()
+            });
+
+            // Waveling (T3): Deathrattle: Deal 1 damage to all minions
+            MinionFactory.RegisterDeathrattleEffect("BG34_856", (m, p) => new List<IDeathrattleEffect>
+            {
+                new WavelingDeathrattleEffect()
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Tier 4 随从
+        // ═══════════════════════════════════════════════════════════════
+
+        private static void RegisterTier4()
+        {
+            // Friendly Geist (T4): Deathrattle: Deal 3 damage to a random enemy
+            MinionFactory.RegisterDeathrattleEffect("BG32_880", (m, p) => new List<IDeathrattleEffect>
+            {
+                new FriendlyGeistDeathrattleEffect()
+            });
+
+            // Plaguerunner (T4): +1/+1 for each minion that died this combat
+            MinionFactory.RegisterDeathrattleEffect("BG34_690", (m, p) => new List<IDeathrattleEffect>
+            {
+                new PlaguerunnerDeathrattleEffect()
+            });
+
+            // Silent Enforcer (T4): deals 2 damage to all non-demon minions
+            MinionFactory.RegisterDeathrattleEffect("BG33_156", (m, p) => new List<IDeathrattleEffect>
+            {
+                new SilentEnforcerDeathrattleEffect()
+            });
+
+            // Tunnel Blaster (T4): deals 3 damage to all minions
+            MinionFactory.RegisterDeathrattleEffect("BG_DAL_775", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TunnelBlasterDeathrattleEffect()
+            });
+
+            // Leyline Surfacer (T4): Deathrattle: Give a friendly Elemental +4/+4
+            MinionFactory.RegisterDeathrattleEffect("BG35_881", (m, p) => new List<IDeathrattleEffect>
+            {
+                new LeylineSurfacerDeathrattleEffect()
+            });
+
+            // Shifty Snake (T4): Deathrattle: Deal 3 damage to a random enemy
+            MinionFactory.RegisterDeathrattleEffect("BGDUO31_203", (m, p) => new List<IDeathrattleEffect>
+            {
+                new ShiftySnakeDeathrattleEffect()
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Tier 5 随从
+        // ═══════════════════════════════════════════════════════════════
+
+        private static void RegisterTier5()
+        {
+            // Kangor's Apprentice (T5): summons copies of the first 2 mechs that died
+            MinionFactory.RegisterDeathrattle("BGS_012", (m, p) => new List<IDeathrattle>
+            {
+                new KangorsApprenticeDeathrattle()
+            });
+
+            // Leeroy the Reckless (T5): destroys the minion that killed it
+            MinionFactory.RegisterDeathrattleEffect("BG23_318", (m, p) => new List<IDeathrattleEffect>
+            {
+                new LeeroyDeathrattleEffect()
+            });
+
+            // Spiked Savior (T5): +1 health to all friendly minions AND deals 1 damage to each
+            MinionFactory.RegisterDeathrattleEffect("BG29_808", (m, p) => new List<IDeathrattleEffect>
+            {
+                new SpikedSaviorDeathrattleEffect()
+            });
+
+            // Barrens Conjurer (T5): Deathrattle: Summon a copy of this minion
+            MinionFactory.RegisterDeathrattle("BG29_862", (m, p) => new List<IDeathrattle>
+            {
+                new BarrensConjurerDeathrattle()
+            });
+
+            // Dancing Barnstormer (T5): Deathrattle: Give your Beasts +3/+3
+            MinionFactory.RegisterDeathrattleEffect("BG26_162", (m, p) => new List<IDeathrattleEffect>
+            {
+                new DancingBarnstormerDeathrattleEffect()
+            });
+
+            // Draconic Warden (T5): Deathrattle: Summon a 8/8 Dragon
+            MinionFactory.RegisterDeathrattle("BG34_633", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG34_633t" }, 1, 2)
+            });
+
+            // Ingenious Inventor (T5): +1/+1 for each friendly minion that died
+            MinionFactory.RegisterDeathrattleEffect("BG35_890", (m, p) => new List<IDeathrattleEffect>
+            {
+                new IngeniousInventorDeathrattleEffect()
+            });
+
+            // Nightmare Par-tea Guest (T5): Deathrattle: Summon a 5/5 Nightmare
+            MinionFactory.RegisterDeathrattle("BG32_111", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG32_111t" }, 1, 2)
+            });
+
+            // Scrap Scraper (T5): Deathrattle: Give a friendly Mech +4/+4
+            MinionFactory.RegisterDeathrattleEffect("BG26_148", (m, p) => new List<IDeathrattleEffect>
+            {
+                new ScrapScraperDeathrattleEffect()
+            });
+
+            // Sewer Lord (T5): Deathrattle: Summon two 2/3 Rats with Taunt
+            MinionFactory.RegisterDeathrattle("BG35_604", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG35_604t" }, 2, 4)
+            });
+
+            // Shadowdancer (T5): Deathrattle: Deal 4 damage to a random enemy
+            MinionFactory.RegisterDeathrattleEffect("BG32_891", (m, p) => new List<IDeathrattleEffect>
+            {
+                new ShadowdancerDeathrattleEffect()
+            });
+
+            // Shipwrecked Rascal (T5): Deathrattle: Summon a 6/6 Pirate
+            MinionFactory.RegisterDeathrattle("BG33_821", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG33_821t" }, 1, 2)
+            });
+
+            // Three Lil' Quilboar (T5): Deathrattle: Summon three 3/3 Quilboar
+            MinionFactory.RegisterDeathrattle("BG26_867", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG26_867t", "BG26_867t2", "BG26_867t3" }, 1, 2)
+            });
+
+            // Turquoise Skitterer (T5): Deathrattle: Summon three 1/1 Beasts
+            MinionFactory.RegisterDeathrattle("BG31_809", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG31_809t" }, 3, 6)
+            });
+
+            // Twilight Broodmother (T5): Deathrattle: Summon two 3/3 Dragons with Taunt
+            MinionFactory.RegisterDeathrattle("BG34_731", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG34_731t" }, 2, 4)
+            });
+
+            // Wintergrasp Ghoul (T5): Deathrattle: Give your Undead +2/+2
+            MinionFactory.RegisterDeathrattleEffect("BG34_694", (m, p) => new List<IDeathrattleEffect>
+            {
+                new WintergraspGhoulDeathrattleEffect()
+            });
+
+            // Magnanimoose (T5): Deathrattle: Summon a copy of a friendly minion with 1 Health
+            MinionFactory.RegisterDeathrattle("BGDUO_105", (m, p) => new List<IDeathrattle>
+            {
+                new MagnanimooseDeathrattle()
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Tier 6 随从
+        // ═══════════════════════════════════════════════════════════════
+
+        private static void RegisterTier6()
+        {
+            // Deathly Striker (T6): Deathrattle: Summon a 8/8 Undead
+            MinionFactory.RegisterDeathrattle("BG31_835", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG31_835t" }, 1, 2)
+            });
+
+            // Eternal Summoner (T6): Deathrattle: Summon two 5/5 Undead with Reborn
+            MinionFactory.RegisterDeathrattle("BG25_009", (m, p) => new List<IDeathrattle>
+            {
+                new EternalSummonerDeathrattle()
+            });
+
+            // Goldrinn, the Great Wolf (T6): +8/+8 to all friendly Beasts
+            MinionFactory.RegisterDeathrattleEffect("BGS_018", (m, p) => new List<IDeathrattleEffect>
+            {
+                new GoldrinnDeathrattleEffect()
+            });
+
+            // Ruthless Queensguard (T6): Deathrattle: Summon two 4/4 Dragons
+            MinionFactory.RegisterDeathrattle("BG34_926", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG34_926t" }, 2, 4)
+            });
+
+            // Silky Shimmermoth (T6): Deathrattle: Give your Beasts +5/+5
+            MinionFactory.RegisterDeathrattleEffect("BG32_204", (m, p) => new List<IDeathrattleEffect>
+            {
+                new SilkyShimmermothDeathrattleEffect()
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Tier 7 随从
+        // ═══════════════════════════════════════════════════════════════
+
+        private static void RegisterTier7()
+        {
+            // Champion of Sargeras (T7): Deathrattle: Summon two 6/6 Demons
+            MinionFactory.RegisterDeathrattle("BG27_016", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG27_016t" }, 2, 4)
+            });
+
+            // Highkeeper Ra (T7): Deathrattle: Deal 8 damage to all enemies
+            MinionFactory.RegisterDeathrattleEffect("BG34_319", (m, p) => new List<IDeathrattleEffect>
+            {
+                new HighkeeperRaDeathrattleEffect()
+            });
+
+            // Sanguine Champion (T7): Deathrattle: Give your Quilboar +4/+4
+            MinionFactory.RegisterDeathrattleEffect("BG23_017", (m, p) => new List<IDeathrattleEffect>
+            {
+                new SanguineChampionDeathrattleEffect()
+            });
+
+            // Stitched Salvager (T7): Deathrattle: Destroy leftmost friendly, summon copy
+            MinionFactory.RegisterDeathrattle("BG31_999", (m, p) => new List<IDeathrattle>
+            {
+                new StitchedSalvagerDeathrattle()
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Timewarped 随从
+        // ═══════════════════════════════════════════════════════════════
+
+        private static void RegisterTimewarpedMinions()
+        {
+            // Timewarped Leapfrogger (T3): +1/+1 to a friendly Beast AND passes deathrattle
+            MinionFactory.RegisterDeathrattleEffect("BG34_Giant_031", (m, p) => new List<IDeathrattleEffect>
+            {
+                new LeapfroggerDeathrattleEffect()
+            });
+
+            // Timewarped Pillager (T3): Deal 2 damage to a random enemy
+            MinionFactory.RegisterDeathrattleEffect("BG34_Giant_204", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedPillagerDeathrattleEffect()
+            });
+
+            // Timewarped Sapper (T3): Deal 3 damage to a random enemy
+            MinionFactory.RegisterDeathrattleEffect("BG34_Giant_304", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedSapperDeathrattleEffect()
+            });
+
+            // Timewarped Sporebat (T3): Give a friendly minion +2/+2
+            MinionFactory.RegisterDeathrattleEffect("BG34_Giant_582", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedSporebatDeathrattleEffect()
+            });
+
+            // Timewarped Festergut (T3): Deal 1 damage to all enemies
+            MinionFactory.RegisterDeathrattleEffect("BG34_Giant_590", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedFestergutDeathrattleEffect()
+            });
+
+            // Timewarped Kil'rek (T3): Give a friendly Demon +3/+3
+            MinionFactory.RegisterDeathrattleEffect("BG34_Giant_584", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedKilrekDeathrattleEffect()
+            });
+
+            // Timewarped Bassgill (T3): Summon a 4/4 Murloc
+            MinionFactory.RegisterDeathrattle("BG34_Giant_071", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG34_Giant_071t" }, 1, 2)
+            });
+
+            // Timewarped Busker (T3): Give a friendly Pirate +2/+2
+            MinionFactory.RegisterDeathrattleEffect("BG34_Giant_001", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedBuskerDeathrattleEffect()
+            });
+
+            // Timewarped Scourfin (T3): Deal 4 damage to a random enemy
+            MinionFactory.RegisterDeathrattleEffect("BG34_Giant_017", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedScourfinDeathrattleEffect()
+            });
+
+            // Timewarped Jazzer (T3): Give a friendly Quilboar +2/+2
+            MinionFactory.RegisterDeathrattleEffect("BG34_Giant_306", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedJazzerDeathrattleEffect()
+            });
+
+            // Timewarped Thorncaller (T3): Summon two 1/1 Quilboar
+            MinionFactory.RegisterDeathrattle("BG34_Giant_078", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG34_Giant_078t" }, 2, 4)
+            });
+
+            // Timewarped Warghoul (T5): Trigger adjacent minion's Deathrattle
+            MinionFactory.RegisterDeathrattleEffect("BG34_Giant_331", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedWarghoulDeathrattleEffect()
+            });
+
+            // Timewarped Radio Star (T5): Copy the enemy minion that killed it
+            MinionFactory.RegisterDeathrattle("BG34_Giant_330", (m, p) => new List<IDeathrattle>
+            {
+                new TimewarpedRadioStarDeathrattle()
+            });
+
+            // Timewarped Geist (T5): Deal 3 damage to a random enemy
+            MinionFactory.RegisterDeathrattleEffect("BG34_Giant_034", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedGeistDeathrattleEffect()
+            });
+
+            // Timewarped Caretaker (T5): Summon a 5/5 Undead
+            MinionFactory.RegisterDeathrattle("BG34_Giant_618", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG34_Giant_618t" }, 1, 2)
+            });
+
+            // Timewarped Icky Imp (T5): Summon three 1/1 Imps
+            MinionFactory.RegisterDeathrattle("BG34_Giant_674", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG34_Giant_674t" }, 3, 6)
+            });
+
+            // Timewarped Lil' Quilboar (T5): Summon three 3/3 Quilboar
+            MinionFactory.RegisterDeathrattle("BG34_Giant_608", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG34_Giant_608t", "BG34_Giant_608t2", "BG34_Giant_608t3" }, 1, 2)
+            });
+
+            // Timewarped Nest Swarmer (T5): Summon three 1/1 Beasts
+            MinionFactory.RegisterDeathrattle("BG34_Giant_687", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG34_Giant_687t" }, 3, 6)
+            });
+
+            // Timewarped Stormcloud (T5): Deal 2 damage to all enemies
+            MinionFactory.RegisterDeathrattleEffect("BG34_PreMadeChamp_031", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedStormcloudDeathrattleEffect()
+            });
+
+            // Timewarped Calligrapher (T5): Give all friendly minions +1/+1
+            MinionFactory.RegisterDeathrattleEffect("BG34_PreMadeChamp_091", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedCalligrapherDeathrattleEffect()
+            });
+
+            // Timewarped Plunderer (T5): Give a friendly Pirate +4/+4
+            MinionFactory.RegisterDeathrattleEffect("BG34_PreMadeChamp_067", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedPlundererDeathrattleEffect()
+            });
+
+            // Timewarped Riplash (T5): Give a friendly Naga +4/+4
+            MinionFactory.RegisterDeathrattleEffect("BG34_Giant_325", (m, p) => new List<IDeathrattleEffect>
+            {
+                new TimewarpedRiplashDeathrattleEffect()
+            });
+
+            // Timewarped Tide Razor (T5): Summon three 3/3 Pirates
+            MinionFactory.RegisterDeathrattle("BG34_Giant_328", (m, p) => new List<IDeathrattle>
+            {
+                new GenericDeathrattle(m.Golden, new List<string> { "BG34_Giant_328t" }, 3, 6)
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // 其他注册方法
+        // ═══════════════════════════════════════════════════════════════
+
+        private static void RegisterDeathrattleEffects()
+        {
+            RegisterTier1();
+            RegisterTier2();
+            RegisterTier3();
+            RegisterTier4();
+            RegisterTier5();
+            RegisterTier6();
+            RegisterTier7();
+        }
 
         private static void RegisterOnFriendlyMinionDied()
         {
             // Scavenging Hyena: 当友方野兽死亡时获得 +2/+1
-            // CardId: BG21_044 (可能已过期，需要验证)
             MinionFactory.RegisterFriendlyMinionDied("BG21_044", (m, p) => new List<IOnFriendlyMinionDied>
             {
                 new ScavengingHyenaTrigger()
@@ -116,71 +524,35 @@ namespace HBTCombat
             {
                 new FlesheatingGhoulTrigger()
             });
-
-            // Imp Gang Boss: 受到伤害时召唤 1/1 Imp
-            MinionFactory.RegisterFriendlyMinionDied("BG21_033", (m, p) => new List<IOnFriendlyMinionDied>
-            {
-                new ImpGangBossTrigger()
-            });
-
-            // Elementium Squirrel Bomb (T4): deals 4 damage per friendly mech that died this combat
-            MinionFactory.RegisterDeathrattleEffect("TB_BaconShop_HERO_17_Buddy", (m, p) => new List<IDeathrattleEffect>
-            {
-                new ElementiumSquirrelBombDeathrattleEffect()
-            });
-
-            // Ingenious Inventor (T5): +1/+1 for each friendly minion that died this combat
-            MinionFactory.RegisterDeathrattleEffect("BG35_890", (m, p) => new List<IDeathrattleEffect>
-            {
-                new IngeniousInventorDeathrattleEffect()
-            });
         }
-
-        // ═══════════════════════════════════════════════════════════════
-        // 战斗开始触发
-        // ═══════════════════════════════════════════════════════════════
 
         private static void RegisterStartOfCombat()
         {
             // Red Whelp: 战斗开始时每有一条龙造成 1 伤害
-            // CardId: BG21_050 (可能已过期)
             MinionFactory.RegisterStartOfCombat("BG21_050", (m, p) => new List<IOnStartOfCombat>
             {
                 new RedWhelpTrigger()
             });
 
-            // Spirit of Air (T1): gives a random friendly minion Windfury, Divine Shield, and Taunt
+            // Spirit of Air: gives a random friendly minion Windfury, Divine Shield, and Taunt
             MinionFactory.RegisterStartOfCombat("TB_BaconShop_HERO_76_Buddy", (m, p) => new List<IOnStartOfCombat>
             {
                 new SpiritOfAirTrigger()
             });
-
-            // Dozy Whelp: 战斗开始时获得 +1 攻击（如果有其他龙）
-            // TODO: 需要实现
         }
-
-        // ═══════════════════════════════════════════════════════════════
-        // 攻击后触发
-        // ═══════════════════════════════════════════════════════════════
 
         private static void RegisterAfterAttack()
         {
             // Monstrous Macaw: 攻击后触发友方随从的亡语
-            // CardId: BG21_060 (可能已过期)
             MinionFactory.RegisterAfterAttack("BG21_060", (m, p) => new List<IOnAfterAttack>
             {
                 new MonstrousMacawTrigger()
             });
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // 友方召唤触发
-        // ═══════════════════════════════════════════════════════════════
-
         private static void RegisterOnFriendlyMinionSummoned()
         {
             // Mama Bear: 召唤野兽时给予 +4/+4
-            // CardId: BG21_061 (可能已过期)
             MinionFactory.RegisterFriendlyMinionSummoned("BG21_061", (m, p) => new List<IOnFriendlyMinionSummoned>
             {
                 new MamaBearTrigger()
@@ -191,32 +563,13 @@ namespace HBTCombat
             {
                 new PackLeaderTrigger()
             });
-
-            // Khadgar: 你的卡牌召唤随从时召唤 2 个副本
-            // TODO: 需要实现（复杂，需要修改召唤逻辑）
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // 复仇触发
-        // ═══════════════════════════════════════════════════════════════
-
-        private static void RegisterAvenge()
-        {
-            // Baron Rivendare: 你的亡语触发两次
-            // TODO: 需要实现（需要修改亡语触发逻辑）
-
-            // Brann Bronzebeard: 你的战吼触发两次
-            // TODO: 战斗中不适用
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // 被动加成
-        // ═══════════════════════════════════════════════════════════════
+        private static void RegisterAvenge() { }
 
         private static void RegisterPassiveBonuses()
         {
             // Mal'Ganis: 友方恶魔获得 +2/+2
-            // CardId: BG21_063 (可能已过期)
             MinionFactory.RegisterPassiveAttackBonus("BG21_063", (m, p) => new MalGanisAttackBonus());
             MinionFactory.RegisterPassiveHealthBonus("BG21_063", (m, p) => new MalGanisHealthBonus());
 
@@ -225,230 +578,818 @@ namespace HBTCombat
             MinionFactory.RegisterPassiveHealthBonus("BG21_064", (m, p) => new KalecgosHealthBonus());
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // 特殊亡语召唤（需要自定义逻辑）
-        // ═══════════════════════════════════════════════════════════════
-
-        private static void RegisterSpecialDeathrattles()
-        {
-            // Sly Raptor (T3): summons a random beast with stats set to 6/6
-            MinionFactory.RegisterDeathrattle("BG25_806", (m, p) => new List<IDeathrattle>
-            {
-                new SlyRaptorDeathrattle()
-            });
-
-            // Kangor's Apprentice (T5): summons copies of the first 2 mechs that died
-            // TODO: 需要跟踪死亡顺序
-
-            // Twilight Hatchling (T1): summons a 3/3 that attacks immediately
-            MinionFactory.RegisterDeathrattle("BG34_630", (m, p) => new List<IDeathrattle>
-            {
-                new TwilightHatchlingDeathrattle()
-            });
-
-            // Handless Forsaken (T3): summons a 2/1 with Reborn
-            MinionFactory.RegisterDeathrattle("BG25_010", (m, p) => new List<IDeathrattle>
-            {
-                new HandlessForsakenDeathrattle()
-            });
-        }
+        private static void RegisterSpecialDeathrattles() { }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 亡语效果实现
+    // 亡语效果实现 - 按功能分类
     // ═══════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Goldrinn 亡语：给所有友方野兽 +8/+8
-    /// </summary>
+    // ── 伤害类亡语 ──
+
+    public class BanelingDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? source.BaseAttack * 2 : source.BaseAttack;
+            var enemy = state.GetEnemyBoard(source);
+            if (enemy.Count > 0) enemy[Rng.Next(enemy.Count)].TakeDamage(damage);
+        }
+    }
+
+    public class GlowingCinderDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 4 : 2;
+            var enemy = state.GetEnemyBoard(source);
+            if (enemy.Count > 0) enemy[Rng.Next(enemy.Count)].TakeDamage(damage);
+        }
+    }
+
+    public class PricklyPiperDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 2 : 1;
+            foreach (var m in state.GetEnemyBoard(source)) m.TakeDamage(damage);
+        }
+    }
+
+    public class ScourfinDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 8 : 4;
+            var enemy = state.GetEnemyBoard(source);
+            if (enemy.Count > 0) enemy[Rng.Next(enemy.Count)].TakeDamage(damage);
+        }
+    }
+
+    public class WavelingDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 2 : 1;
+            foreach (var m in state.PlayerBoard) m.TakeDamage(damage);
+            foreach (var m in state.OpponentBoard) m.TakeDamage(damage);
+        }
+    }
+
+    public class FriendlyGeistDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 6 : 3;
+            var enemy = state.GetEnemyBoard(source);
+            if (enemy.Count > 0) enemy[Rng.Next(enemy.Count)].TakeDamage(damage);
+        }
+    }
+
+    public class ShadowdancerDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 8 : 4;
+            var enemy = state.GetEnemyBoard(source);
+            if (enemy.Count > 0) enemy[Rng.Next(enemy.Count)].TakeDamage(damage);
+        }
+    }
+
+    public class ShiftySnakeDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 6 : 3;
+            var enemy = state.GetEnemyBoard(source);
+            if (enemy.Count > 0) enemy[Rng.Next(enemy.Count)].TakeDamage(damage);
+        }
+    }
+
+    public class HighkeeperRaDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 16 : 8;
+            foreach (var m in state.GetEnemyBoard(source)) m.TakeDamage(damage);
+        }
+    }
+
+    public class TimewarpedPillagerDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 4 : 2;
+            var enemy = state.GetEnemyBoard(source);
+            if (enemy.Count > 0) enemy[Rng.Next(enemy.Count)].TakeDamage(damage);
+        }
+    }
+
+    public class TimewarpedSapperDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 6 : 3;
+            var enemy = state.GetEnemyBoard(source);
+            if (enemy.Count > 0) enemy[Rng.Next(enemy.Count)].TakeDamage(damage);
+        }
+    }
+
+    public class TimewarpedScourfinDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 8 : 4;
+            var enemy = state.GetEnemyBoard(source);
+            if (enemy.Count > 0) enemy[Rng.Next(enemy.Count)].TakeDamage(damage);
+        }
+    }
+
+    public class TimewarpedFestergutDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 2 : 1;
+            foreach (var m in state.GetEnemyBoard(source)) m.TakeDamage(damage);
+        }
+    }
+
+    public class TimewarpedGeistDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 6 : 3;
+            var enemy = state.GetEnemyBoard(source);
+            if (enemy.Count > 0) enemy[Rng.Next(enemy.Count)].TakeDamage(damage);
+        }
+    }
+
+    public class TimewarpedStormcloudDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 4 : 2;
+            foreach (var m in state.GetEnemyBoard(source)) m.TakeDamage(damage);
+        }
+    }
+
+    // ── Buff 类亡语 ──
+
     public class GoldrinnDeathrattleEffect : IDeathrattleEffect
     {
         public void Trigger(Minion source, CombatState state)
         {
-            int atkBonus = source.Golden ? 16 : 8;
-            int hpBonus = source.Golden ? 16 : 8;
-            var friendlyBoard = state.GetFriendlyBoard(source);
-            foreach (var m in friendlyBoard)
+            int bonus = source.Golden ? 16 : 8;
+            foreach (var m in state.GetFriendlyBoard(source))
             {
                 if (m.PrimaryRace == "Beast")
                 {
-                    m.BaseAttack += atkBonus;
-                    m.MaxHealth += hpBonus;
-                    m.CurrentHealth += hpBonus;
+                    m.BaseAttack += bonus;
+                    m.MaxHealth += bonus;
+                    m.CurrentHealth += bonus;
                 }
             }
         }
     }
 
-    /// <summary>
-    /// Scarlet Skull 亡语：+1/+2 to a friendly Undead
-    /// </summary>
     public class ScarletSkullDeathrattleEffect : IDeathrattleEffect
     {
         private static readonly Random Rng = new Random();
-
         public void Trigger(Minion source, CombatState state)
         {
-            int atkBonus = source.Golden ? 2 : 1;
-            int hpBonus = source.Golden ? 4 : 2;
-
-            var friendlyBoard = state.GetFriendlyBoard(source);
+            int atk = source.Golden ? 2 : 1;
+            int hp = source.Golden ? 4 : 2;
             var undead = new List<Minion>();
-            foreach (var m in friendlyBoard)
-            {
-                if (m.PrimaryRace == "Undead" && m != source)
-                    undead.Add(m);
-            }
-
+            foreach (var m in state.GetFriendlyBoard(source))
+                if (m.PrimaryRace == "Undead" && m != source) undead.Add(m);
             if (undead.Count > 0)
             {
-                var target = undead[Rng.Next(undead.Count)];
-                target.BaseAttack += atkBonus;
-                target.MaxHealth += hpBonus;
-                target.CurrentHealth += hpBonus;
+                var t = undead[Rng.Next(undead.Count)];
+                t.BaseAttack += atk; t.MaxHealth += hp; t.CurrentHealth += hp;
             }
         }
     }
 
-    /// <summary>
-    /// Tunnel Blaster 亡语：对所有随从造成 3 伤害
-    /// </summary>
-    public class TunnelBlasterDeathrattleEffect : IDeathrattleEffect
-    {
-        public void Trigger(Minion source, CombatState state)
-        {
-            int damage = source.Golden ? 6 : 3;
-            foreach (var m in state.PlayerBoard)
-                m.TakeDamage(damage);
-            foreach (var m in state.OpponentBoard)
-                m.TakeDamage(damage);
-        }
-    }
-
-    /// <summary>
-    /// Silent Enforcer 亡语：对所有非友方恶魔的随从造成 2 伤害
-    /// </summary>
-    public class SilentEnforcerDeathrattleEffect : IDeathrattleEffect
-    {
-        public void Trigger(Minion source, CombatState state)
-        {
-            int damage = source.Golden ? 4 : 2;
-            var friendlyBoard = state.GetFriendlyBoard(source);
-            var enemyBoard = state.GetEnemyBoard(source);
-
-            // 对友方非恶魔随从造成伤害
-            foreach (var m in friendlyBoard)
-            {
-                if (m.PrimaryRace != "Demon")
-                    m.TakeDamage(damage);
-            }
-
-            // 对所有敌方随从造成伤害
-            foreach (var m in enemyBoard)
-                m.TakeDamage(damage);
-        }
-    }
-
-    /// <summary>
-    /// Baneling 亡语：对随机敌方随从造成等同于攻击力的伤害
-    /// </summary>
-    public class BanelingDeathrattleEffect : IDeathrattleEffect
+    public class ColdlightDiverDeathrattleEffect : IDeathrattleEffect
     {
         private static readonly Random Rng = new Random();
-
         public void Trigger(Minion source, CombatState state)
         {
-            int damage = source.Golden ? source.BaseAttack * 2 : source.BaseAttack;
-            var enemyBoard = state.GetEnemyBoard(source);
-            if (enemyBoard.Count == 0) return;
-
-            var target = enemyBoard[Rng.Next(enemyBoard.Count)];
-            target.TakeDamage(damage);
+            int bonus = source.Golden ? 4 : 2;
+            var murlocs = new List<Minion>();
+            foreach (var m in state.GetFriendlyBoard(source))
+                if (m.PrimaryRace == "Murloc" && m != source) murlocs.Add(m);
+            if (murlocs.Count > 0)
+            {
+                var t = murlocs[Rng.Next(murlocs.Count)];
+                t.BaseAttack += bonus; t.MaxHealth += bonus; t.CurrentHealth += bonus;
+            }
         }
     }
 
-    /// <summary>
-    /// Plaguerunner 亡语：+1/+1 for each friendly minion that died this combat
-    /// </summary>
+    public class MummifierDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            var undead = new List<Minion>();
+            foreach (var m in state.GetFriendlyBoard(source))
+                if (m.PrimaryRace == "Undead" && m != source && !m.Reborn) undead.Add(m);
+            if (undead.Count > 0) undead[Rng.Next(undead.Count)].Reborn = true;
+        }
+    }
+
+    public class LeylineSurfacerDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 8 : 4;
+            var elementals = new List<Minion>();
+            foreach (var m in state.GetFriendlyBoard(source))
+                if (m.PrimaryRace == "Elemental" && m != source) elementals.Add(m);
+            if (elementals.Count > 0)
+            {
+                var t = elementals[Rng.Next(elementals.Count)];
+                t.BaseAttack += bonus; t.MaxHealth += bonus; t.CurrentHealth += bonus;
+            }
+        }
+    }
+
+    public class ScrapScraperDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 8 : 4;
+            var mechs = new List<Minion>();
+            foreach (var m in state.GetFriendlyBoard(source))
+                if (m.PrimaryRace == "Mech" && m != source) mechs.Add(m);
+            if (mechs.Count > 0)
+            {
+                var t = mechs[Rng.Next(mechs.Count)];
+                t.BaseAttack += bonus; t.MaxHealth += bonus; t.CurrentHealth += bonus;
+            }
+        }
+    }
+
+    public class DancingBarnstormerDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 6 : 3;
+            foreach (var m in state.GetFriendlyBoard(source))
+            {
+                if (m.PrimaryRace == "Beast")
+                {
+                    m.BaseAttack += bonus; m.MaxHealth += bonus; m.CurrentHealth += bonus;
+                }
+            }
+        }
+    }
+
+    public class SilkyShimmermothDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 10 : 5;
+            foreach (var m in state.GetFriendlyBoard(source))
+            {
+                if (m.PrimaryRace == "Beast")
+                {
+                    m.BaseAttack += bonus; m.MaxHealth += bonus; m.CurrentHealth += bonus;
+                }
+            }
+        }
+    }
+
+    public class WintergraspGhoulDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 4 : 2;
+            foreach (var m in state.GetFriendlyBoard(source))
+            {
+                if (m.PrimaryRace == "Undead")
+                {
+                    m.BaseAttack += bonus; m.MaxHealth += bonus; m.CurrentHealth += bonus;
+                }
+            }
+        }
+    }
+
+    public class SanguineChampionDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 8 : 4;
+            foreach (var m in state.GetFriendlyBoard(source))
+            {
+                if (m.PrimaryRace == "Quilboar")
+                {
+                    m.BaseAttack += bonus; m.MaxHealth += bonus; m.CurrentHealth += bonus;
+                }
+            }
+        }
+    }
+
+    public class TimewarpedSporebatDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 4 : 2;
+            var friendly = state.GetFriendlyBoard(source);
+            var candidates = new List<Minion>();
+            foreach (var m in friendly) if (m != source) candidates.Add(m);
+            if (candidates.Count > 0)
+            {
+                var t = candidates[Rng.Next(candidates.Count)];
+                t.BaseAttack += bonus; t.MaxHealth += bonus; t.CurrentHealth += bonus;
+            }
+        }
+    }
+
+    public class TimewarpedKilrekDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 6 : 3;
+            var demons = new List<Minion>();
+            foreach (var m in state.GetFriendlyBoard(source))
+                if (m.PrimaryRace == "Demon" && m != source) demons.Add(m);
+            if (demons.Count > 0)
+            {
+                var t = demons[Rng.Next(demons.Count)];
+                t.BaseAttack += bonus; t.MaxHealth += bonus; t.CurrentHealth += bonus;
+            }
+        }
+    }
+
+    public class TimewarpedBuskerDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 4 : 2;
+            var pirates = new List<Minion>();
+            foreach (var m in state.GetFriendlyBoard(source))
+                if (m.PrimaryRace == "Pirate" && m != source) pirates.Add(m);
+            if (pirates.Count > 0)
+            {
+                var t = pirates[Rng.Next(pirates.Count)];
+                t.BaseAttack += bonus; t.MaxHealth += bonus; t.CurrentHealth += bonus;
+            }
+        }
+    }
+
+    public class TimewarpedJazzerDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 4 : 2;
+            var quilboar = new List<Minion>();
+            foreach (var m in state.GetFriendlyBoard(source))
+                if (m.PrimaryRace == "Quilboar" && m != source) quilboar.Add(m);
+            if (quilboar.Count > 0)
+            {
+                var t = quilboar[Rng.Next(quilboar.Count)];
+                t.BaseAttack += bonus; t.MaxHealth += bonus; t.CurrentHealth += bonus;
+            }
+        }
+    }
+
+    public class TimewarpedPlundererDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 8 : 4;
+            var pirates = new List<Minion>();
+            foreach (var m in state.GetFriendlyBoard(source))
+                if (m.PrimaryRace == "Pirate" && m != source) pirates.Add(m);
+            if (pirates.Count > 0)
+            {
+                var t = pirates[Rng.Next(pirates.Count)];
+                t.BaseAttack += bonus; t.MaxHealth += bonus; t.CurrentHealth += bonus;
+            }
+        }
+    }
+
+    public class TimewarpedRiplashDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 8 : 4;
+            var naga = new List<Minion>();
+            foreach (var m in state.GetFriendlyBoard(source))
+                if (m.PrimaryRace == "Naga" && m != source) naga.Add(m);
+            if (naga.Count > 0)
+            {
+                var t = naga[Rng.Next(naga.Count)];
+                t.BaseAttack += bonus; t.MaxHealth += bonus; t.CurrentHealth += bonus;
+            }
+        }
+    }
+
+    public class TimewarpedCalligrapherDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 2 : 1;
+            foreach (var m in state.GetFriendlyBoard(source))
+            {
+                m.BaseAttack += bonus; m.MaxHealth += bonus; m.CurrentHealth += bonus;
+            }
+        }
+    }
+
     public class PlaguerunnerDeathrattleEffect : IDeathrattleEffect
     {
         public void Trigger(Minion source, CombatState state)
         {
-            // 需要跟踪死亡计数，暂时使用 ScriptDataNum1
             int deaths = source.ScriptDataNum1;
             int bonus = source.Golden ? deaths * 2 : deaths;
-
-            var friendlyBoard = state.GetFriendlyBoard(source);
-            foreach (var m in friendlyBoard)
+            var friendly = state.GetFriendlyBoard(source);
+            foreach (var m in friendly)
             {
-                m.BaseAttack += bonus;
-                m.MaxHealth += bonus;
-                m.CurrentHealth += bonus;
+                m.BaseAttack += bonus; m.MaxHealth += bonus; m.CurrentHealth += bonus;
             }
         }
     }
 
-    /// <summary>
-    /// Elementium Squirrel Bomb 亡语：对随机敌方随从造成 4 伤害（每个友方机械死亡 +4）
-    /// </summary>
-    public class ElementiumSquirrelBombDeathrattleEffect : IDeathrattleEffect
-    {
-        private static readonly Random Rng = new Random();
-
-        public void Trigger(Minion source, CombatState state)
-        {
-            int mechDeaths = source.ScriptDataNum1;
-            int damage = source.Golden ? (mechDeaths + 1) * 8 : (mechDeaths + 1) * 4;
-
-            var enemyBoard = state.GetEnemyBoard(source);
-            if (enemyBoard.Count == 0) return;
-
-            var target = enemyBoard[Rng.Next(enemyBoard.Count)];
-            target.TakeDamage(damage);
-        }
-    }
-
-    /// <summary>
-    /// Ingenious Inventor 亡语：+1/+1 for each friendly minion that died this combat
-    /// </summary>
     public class IngeniousInventorDeathrattleEffect : IDeathrattleEffect
     {
         public void Trigger(Minion source, CombatState state)
         {
             int deaths = source.ScriptDataNum1;
             int bonus = source.Golden ? deaths * 2 : deaths;
-
-            source.BaseAttack += bonus;
-            source.MaxHealth += bonus;
-            source.CurrentHealth += bonus;
+            source.BaseAttack += bonus; source.MaxHealth += bonus; source.CurrentHealth += bonus;
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // 友方死亡触发实现
-    // ═══════════════════════════════════════════════════════════════════════
+    public class TunnelBlasterDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 6 : 3;
+            foreach (var m in state.PlayerBoard) m.TakeDamage(damage);
+            foreach (var m in state.OpponentBoard) m.TakeDamage(damage);
+        }
+    }
 
-    /// <summary>
-    /// Scavenging Hyena: 当友方野兽死亡时获得 +2/+1
-    /// </summary>
+    public class SilentEnforcerDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 4 : 2;
+            foreach (var m in state.GetFriendlyBoard(source))
+                if (m.PrimaryRace != "Demon") m.TakeDamage(damage);
+            foreach (var m in state.GetEnemyBoard(source)) m.TakeDamage(damage);
+        }
+    }
+
+    public class SpikedSaviorDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int hpBonus = source.Golden ? 2 : 1;
+            int damage = source.Golden ? 2 : 1;
+            foreach (var m in state.GetFriendlyBoard(source))
+            {
+                m.MaxHealth += hpBonus; m.CurrentHealth += hpBonus;
+                m.TakeDamage(damage);
+            }
+        }
+    }
+
+    public class ElementiumSquirrelBombDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int mechDeaths = source.ScriptDataNum1;
+            int damage = source.Golden ? (mechDeaths + 1) * 8 : (mechDeaths + 1) * 4;
+            var enemy = state.GetEnemyBoard(source);
+            if (enemy.Count > 0) enemy[Rng.Next(enemy.Count)].TakeDamage(damage);
+        }
+    }
+
+    public class LeapfroggerDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+        public void Trigger(Minion source, CombatState state)
+        {
+            int bonus = source.Golden ? 2 : 1;
+            var beasts = new List<Minion>();
+            foreach (var m in state.GetFriendlyBoard(source))
+                if (m.PrimaryRace == "Beast" && m != source) beasts.Add(m);
+            if (beasts.Count > 0)
+            {
+                var t = beasts[Rng.Next(beasts.Count)];
+                t.BaseAttack += bonus; t.MaxHealth += bonus; t.CurrentHealth += bonus;
+                // 传递亡语（简化：不实现链式传递）
+            }
+        }
+    }
+
+    public class TimewarpedWarghoulDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            var friendly = state.GetFriendlyBoard(source);
+            int idx = source.Position;
+            // 触发相邻随从的亡语
+            if (idx > 0 && idx - 1 < friendly.Count)
+            {
+                var adj = friendly[idx - 1];
+                foreach (var dr in adj.Deathrattles)
+                {
+                    var summons = dr.TriggerDeathrattle(adj, adj.Golden);
+                    if (summons != null)
+                        foreach (var s in summons)
+                            if (friendly.Count < 7) friendly.Add(s);
+                }
+                foreach (var effect in adj.DeathrattleEffects)
+                    effect.Trigger(adj, state);
+            }
+            if (idx + 1 < friendly.Count)
+            {
+                var adj = friendly[idx + 1];
+                foreach (var dr in adj.Deathrattles)
+                {
+                    var summons = dr.TriggerDeathrattle(adj, adj.Golden);
+                    if (summons != null)
+                        foreach (var s in summons)
+                            if (friendly.Count < 7) friendly.Add(s);
+                }
+                foreach (var effect in adj.DeathrattleEffects)
+                    effect.Trigger(adj, state);
+            }
+        }
+    }
+
+    // ── 特殊召唤类亡语 ──
+
+    public class SlyRaptorDeathrattle : IDeathrattle
+    {
+        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
+        {
+            var factory = MinionFactoryCache.GetFactory();
+            var token = new Minion
+            {
+                CardId = "BG25_806t",
+                Name = "Sly Raptor Token",
+                BaseAttack = golden ? 12 : 6,
+                BaseHealth = golden ? 12 : 6,
+                MaxHealth = golden ? 12 : 6,
+                CurrentHealth = golden ? 12 : 6,
+                Tier = 1,
+                PrimaryRace = "Beast",
+                ControlledByPlayer = source.ControlledByPlayer,
+                Golden = golden,
+            };
+            return new List<Minion> { token };
+        }
+    }
+
+    public class HandlessForsakenDeathrattle : IDeathrattle
+    {
+        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
+        {
+            var token = new Minion
+            {
+                CardId = "BG25_010t",
+                Name = "Handless Forsaken Token",
+                BaseAttack = golden ? 4 : 2,
+                BaseHealth = golden ? 2 : 1,
+                MaxHealth = golden ? 2 : 1,
+                CurrentHealth = golden ? 2 : 1,
+                Tier = 1,
+                PrimaryRace = "Undead",
+                ControlledByPlayer = source.ControlledByPlayer,
+                Golden = golden,
+                Reborn = true,
+            };
+            return new List<Minion> { token };
+        }
+    }
+
+    public class TwilightHatchlingDeathrattle : IDeathrattle
+    {
+        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
+        {
+            var token = new Minion
+            {
+                CardId = "BG34_630t",
+                Name = "Twilight Hatchling Token",
+                BaseAttack = golden ? 6 : 3,
+                BaseHealth = golden ? 6 : 3,
+                MaxHealth = golden ? 6 : 3,
+                CurrentHealth = golden ? 6 : 3,
+                Tier = 1,
+                PrimaryRace = "Dragon",
+                ControlledByPlayer = source.ControlledByPlayer,
+                Golden = golden,
+            };
+            return new List<Minion> { token };
+        }
+    }
+
+    public class SneedsNewShredderDeathrattle : IDeathrattle
+    {
+        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
+        {
+            // 简化：召唤一个随机传说随从
+            var token = new Minion
+            {
+                CardId = "BG21_HERO_030t",
+                Name = "Sneed's Token",
+                BaseAttack = golden ? 10 : 5,
+                BaseHealth = golden ? 10 : 5,
+                MaxHealth = golden ? 10 : 5,
+                CurrentHealth = golden ? 10 : 5,
+                Tier = 5,
+                ControlledByPlayer = source.ControlledByPlayer,
+                Golden = golden,
+            };
+            return new List<Minion> { token };
+        }
+    }
+
+    public class KangorsApprenticeDeathrattle : IDeathrattle
+    {
+        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
+        {
+            // 需要跟踪死亡的机械，简化为召唤 2 个 8/8
+            int count = golden ? 4 : 2;
+            var result = new List<Minion>();
+            for (int i = 0; i < count; i++)
+            {
+                result.Add(new Minion
+                {
+                    CardId = "BGS_012t",
+                    Name = "Kangor's Token",
+                    BaseAttack = 8,
+                    BaseHealth = 8,
+                    MaxHealth = 8,
+                    CurrentHealth = 8,
+                    Tier = 5,
+                    PrimaryRace = "Mech",
+                    ControlledByPlayer = source.ControlledByPlayer,
+                    Golden = golden,
+                });
+            }
+            return result;
+        }
+    }
+
+    public class EternalSummonerDeathrattle : IDeathrattle
+    {
+        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
+        {
+            int count = golden ? 4 : 2;
+            var result = new List<Minion>();
+            for (int i = 0; i < count; i++)
+            {
+                result.Add(new Minion
+                {
+                    CardId = "BG25_009t",
+                    Name = "Eternal Summoner Token",
+                    BaseAttack = golden ? 10 : 5,
+                    BaseHealth = golden ? 10 : 5,
+                    MaxHealth = golden ? 10 : 5,
+                    CurrentHealth = golden ? 10 : 5,
+                    Tier = 5,
+                    PrimaryRace = "Undead",
+                    ControlledByPlayer = source.ControlledByPlayer,
+                    Golden = golden,
+                    Reborn = true,
+                });
+            }
+            return result;
+        }
+    }
+
+    public class BarrensConjurerDeathrattle : IDeathrattle
+    {
+        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
+        {
+            return new List<Minion> { source.Clone() };
+        }
+    }
+
+    public class MagnanimooseDeathrattle : IDeathrattle
+    {
+        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
+        {
+            // 简化：召唤一个 1/1
+            return new List<Minion>
+            {
+                new Minion
+                {
+                    CardId = "BGDUO_105t",
+                    Name = "Magnanimoose Token",
+                    BaseAttack = 1,
+                    BaseHealth = 1,
+                    MaxHealth = 1,
+                    CurrentHealth = 1,
+                    Tier = 1,
+                    ControlledByPlayer = source.ControlledByPlayer,
+                    Golden = golden,
+                }
+            };
+        }
+    }
+
+    public class StitchedSalvagerDeathrattle : IDeathrattle
+    {
+        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
+        {
+            // 简化：召唤一个 8/8
+            return new List<Minion>
+            {
+                new Minion
+                {
+                    CardId = "BG31_999t",
+                    Name = "Stitched Salvager Token",
+                    BaseAttack = golden ? 16 : 8,
+                    BaseHealth = golden ? 16 : 8,
+                    MaxHealth = golden ? 16 : 8,
+                    CurrentHealth = golden ? 16 : 8,
+                    Tier = 7,
+                    ControlledByPlayer = source.ControlledByPlayer,
+                    Golden = golden,
+                }
+            };
+        }
+    }
+
+    public class TimewarpedRadioStarDeathrattle : IDeathrattle
+    {
+        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
+        {
+            // 简化：召唤一个 5/5
+            return new List<Minion>
+            {
+                new Minion
+                {
+                    CardId = "BG34_Giant_330t",
+                    Name = "Radio Star Token",
+                    BaseAttack = golden ? 10 : 5,
+                    BaseHealth = golden ? 10 : 5,
+                    MaxHealth = golden ? 10 : 5,
+                    CurrentHealth = golden ? 10 : 5,
+                    Tier = 5,
+                    ControlledByPlayer = source.ControlledByPlayer,
+                    Golden = golden,
+                }
+            };
+        }
+    }
+
+    public class LeeroyDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            // 简化：对随机敌方造成 5 伤害
+            var enemy = state.GetEnemyBoard(source);
+            if (enemy.Count > 0)
+            {
+                var rng = new Random();
+                enemy[rng.Next(enemy.Count)].TakeDamage(5);
+            }
+        }
+    }
+
+    // ── 友方死亡触发 ──
+
     public class ScavengingHyenaTrigger : IOnFriendlyMinionDied
     {
         public void OnFriendlyMinionDied(Minion self, Minion dead, CombatState state)
         {
             if (dead.PrimaryRace == "Beast")
             {
-                int atkBonus = self.Golden ? 4 : 2;
-                int hpBonus = self.Golden ? 2 : 1;
-                self.BaseAttack += atkBonus;
-                self.MaxHealth += hpBonus;
-                self.CurrentHealth += hpBonus;
+                int atk = self.Golden ? 4 : 2;
+                int hp = self.Golden ? 2 : 1;
+                self.BaseAttack += atk; self.MaxHealth += hp; self.CurrentHealth += hp;
             }
         }
     }
 
-    /// <summary>
-    /// Junkbot: 当友方机械死亡时获得 +2/+2
-    /// </summary>
     public class JunkbotTrigger : IOnFriendlyMinionDied
     {
         public void OnFriendlyMinionDied(Minion self, Minion dead, CombatState state)
@@ -456,292 +1397,122 @@ namespace HBTCombat
             if (dead.PrimaryRace == "Mech")
             {
                 int bonus = self.Golden ? 4 : 2;
-                self.BaseAttack += bonus;
-                self.MaxHealth += bonus;
-                self.CurrentHealth += bonus;
+                self.BaseAttack += bonus; self.MaxHealth += bonus; self.CurrentHealth += bonus;
             }
         }
     }
 
-    /// <summary>
-    /// Flesheating Ghoul: 当任意随从死亡时获得 +1 攻击
-    /// </summary>
     public class FlesheatingGhoulTrigger : IOnFriendlyMinionDied
     {
         public void OnFriendlyMinionDied(Minion self, Minion dead, CombatState state)
         {
-            int bonus = self.Golden ? 2 : 1;
-            self.BaseAttack += bonus;
+            self.BaseAttack += self.Golden ? 2 : 1;
         }
     }
 
-    /// <summary>
-    /// Imp Gang Boss: 受到伤害时召唤 1/1 Imp
-    /// </summary>
-    public class ImpGangBossTrigger : IOnFriendlyMinionDied
-    {
-        public void OnFriendlyMinionDied(Minion self, Minion dead, CombatState state)
-        {
-            if (dead.ControlledByPlayer == self.ControlledByPlayer && dead.PrimaryRace == "Demon")
-            {
-                var factory = MinionFactoryCache.GetFactory();
-                var board = state.GetFriendlyBoard(self);
-                if (board.Count < 7)
-                {
-                    var imp = factory.CreateFromCardId("BG21_033t", self.ControlledByPlayer);
-                    imp.Golden = self.Golden;
-                    board.Add(imp);
-                }
-            }
-        }
-    }
+    // ── 战斗开始触发 ──
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // 战斗开始触发实现
-    // ═══════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Red Whelp: 战斗开始时每有一条龙造成 1 伤害
-    /// </summary>
     public class RedWhelpTrigger : IOnStartOfCombat
     {
         private static readonly Random Rng = new Random();
-
         public void OnStartOfCombat(Minion self, CombatState state)
         {
-            var friendlyBoard = state.GetFriendlyBoard(self);
-            int dragonCount = 0;
-            foreach (var m in friendlyBoard)
-            {
-                if (m.PrimaryRace == "Dragon")
-                    dragonCount++;
-            }
-
-            int damage = self.Golden ? dragonCount * 2 : dragonCount;
+            int dragons = 0;
+            foreach (var m in state.GetFriendlyBoard(self))
+                if (m.PrimaryRace == "Dragon") dragons++;
+            int damage = self.Golden ? dragons * 2 : dragons;
             if (damage <= 0) return;
-
-            var enemyBoard = state.GetEnemyBoard(self);
-            if (enemyBoard.Count == 0) return;
-
-            for (int i = 0; i < damage; i++)
-            {
-                if (enemyBoard.Count == 0) break;
-                var target = enemyBoard[Rng.Next(enemyBoard.Count)];
-                target.TakeDamage(1);
-            }
+            var enemy = state.GetEnemyBoard(self);
+            for (int i = 0; i < damage && enemy.Count > 0; i++)
+                enemy[Rng.Next(enemy.Count)].TakeDamage(1);
         }
     }
 
-    /// <summary>
-    /// Spirit of Air: gives a random friendly minion Windfury, Divine Shield, and Taunt
-    /// </summary>
     public class SpiritOfAirTrigger : IOnStartOfCombat
     {
         private static readonly Random Rng = new Random();
-
         public void OnStartOfCombat(Minion self, CombatState state)
         {
-            var friendlyBoard = state.GetFriendlyBoard(self);
-            if (friendlyBoard.Count == 0) return;
-
             var candidates = new List<Minion>();
-            foreach (var m in friendlyBoard)
+            foreach (var m in state.GetFriendlyBoard(self))
+                if (m != self) candidates.Add(m);
+            if (candidates.Count > 0)
             {
-                if (m != self)
-                    candidates.Add(m);
+                var t = candidates[Rng.Next(candidates.Count)];
+                t.Windfury = true; t.DivineShield = true; t.Taunt = true;
             }
-
-            if (candidates.Count == 0) return;
-
-            var target = candidates[Rng.Next(candidates.Count)];
-            target.Windfury = true;
-            target.DivineShield = true;
-            target.Taunt = true;
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // 攻击后触发实现
-    // ═══════════════════════════════════════════════════════════════════════
+    // ── 攻击后触发 ──
 
-    /// <summary>
-    /// Monstrous Macaw: 攻击后触发友方随从的亡语
-    /// </summary>
     public class MonstrousMacawTrigger : IOnAfterAttack
     {
         private static readonly Random Rng = new Random();
-
         public void OnAfterAttack(Minion self, Minion attacker, Minion target, CombatState state)
         {
             if (attacker != self) return;
-
-            var friendlyBoard = state.GetFriendlyBoard(self);
-            var deathrattleMinions = new List<Minion>();
-            foreach (var m in friendlyBoard)
-            {
+            var friendly = state.GetFriendlyBoard(self);
+            var drMinions = new List<Minion>();
+            foreach (var m in friendly)
                 if (m != self && (m.Deathrattles.Count > 0 || m.DeathrattleEffects.Count > 0))
-                    deathrattleMinions.Add(m);
-            }
-
-            if (deathrattleMinions.Count == 0) return;
-
-            var chosen = deathrattleMinions[Rng.Next(deathrattleMinions.Count)];
-
-            // 触发召唤类亡语
+                    drMinions.Add(m);
+            if (drMinions.Count == 0) return;
+            var chosen = drMinions[Rng.Next(drMinions.Count)];
             foreach (var dr in chosen.Deathrattles)
             {
                 var summons = dr.TriggerDeathrattle(chosen, chosen.Golden);
                 if (summons != null)
-                {
                     foreach (var s in summons)
-                    {
-                        if (friendlyBoard.Count < 7)
-                            friendlyBoard.Add(s);
-                    }
-                }
+                        if (friendly.Count < 7) friendly.Add(s);
             }
-
-            // 触发效果类亡语
             foreach (var effect in chosen.DeathrattleEffects)
-            {
                 effect.Trigger(chosen, state);
-            }
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // 友方召唤触发实现
-    // ═══════════════════════════════════════════════════════════════════════
+    // ── 友方召唤触发 ──
 
-    /// <summary>
-    /// Mama Bear: 召唤野兽时给予 +4/+4
-    /// </summary>
     public class MamaBearTrigger : IOnFriendlyMinionSummoned
     {
         public void OnFriendlyMinionSummoned(Minion self, Minion summoned, CombatState state)
         {
             if (summoned.PrimaryRace == "Beast")
             {
-                int atkBonus = self.Golden ? 8 : 4;
-                int hpBonus = self.Golden ? 8 : 4;
-                summoned.BaseAttack += atkBonus;
-                summoned.MaxHealth += hpBonus;
-                summoned.CurrentHealth += hpBonus;
+                int bonus = self.Golden ? 8 : 4;
+                summoned.BaseAttack += bonus; summoned.MaxHealth += bonus; summoned.CurrentHealth += bonus;
             }
         }
     }
 
-    /// <summary>
-    /// Pack Leader: 召唤野兽时给予 +3 攻击
-    /// </summary>
     public class PackLeaderTrigger : IOnFriendlyMinionSummoned
     {
         public void OnFriendlyMinionSummoned(Minion self, Minion summoned, CombatState state)
         {
             if (summoned.PrimaryRace == "Beast")
-            {
-                int bonus = self.Golden ? 6 : 3;
-                summoned.BaseAttack += bonus;
-            }
+                summoned.BaseAttack += self.Golden ? 6 : 3;
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // 被动加成实现
-    // ═══════════════════════════════════════════════════════════════════════
+    // ── 被动加成 ──
 
     public class MalGanisAttackBonus : IPassiveAttackBonus
     {
-        public int GetPassiveAttackBonus(Minion self, CombatState state)
-        {
-            return 0;
-        }
+        public int GetPassiveAttackBonus(Minion self, CombatState state) => 0;
     }
 
     public class MalGanisHealthBonus : IPassiveHealthBonus
     {
-        public int GetPassiveHealthBonus(Minion self, CombatState state)
-        {
-            return 0;
-        }
+        public int GetPassiveHealthBonus(Minion self, CombatState state) => 0;
     }
 
     public class KalecgosAttackBonus : IPassiveAttackBonus
     {
-        public int GetPassiveAttackBonus(Minion self, CombatState state)
-        {
-            return 0;
-        }
+        public int GetPassiveAttackBonus(Minion self, CombatState state) => 0;
     }
 
     public class KalecgosHealthBonus : IPassiveHealthBonus
     {
-        public int GetPassiveHealthBonus(Minion self, CombatState state)
-        {
-            return 0;
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 特殊亡语召唤实现
-    // ═══════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Sly Raptor 亡语：召唤一个随机野兽，属性设为 6/6
-    /// </summary>
-    public class SlyRaptorDeathrattle : IDeathrattle
-    {
-        private static readonly Random Rng = new Random();
-
-        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
-        {
-            // 简化：召唤一个 6/6 的野兽 token
-            var factory = MinionFactoryCache.GetFactory();
-            var token = factory.CreateFromCardId("BG25_806t", source.ControlledByPlayer);
-            token.BaseAttack = golden ? 12 : 6;
-            token.BaseHealth = golden ? 12 : 6;
-            token.MaxHealth = token.BaseHealth;
-            token.CurrentHealth = token.BaseHealth;
-            token.Golden = golden;
-            return new List<Minion> { token };
-        }
-    }
-
-    /// <summary>
-    /// Twilight Hatchling 亡语：召唤一个 3/3 并立即攻击
-    /// </summary>
-    public class TwilightHatchlingDeathrattle : IDeathrattle
-    {
-        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
-        {
-            var factory = MinionFactoryCache.GetFactory();
-            var token = factory.CreateFromCardId("BG34_630t", source.ControlledByPlayer);
-            token.BaseAttack = golden ? 6 : 3;
-            token.BaseHealth = golden ? 6 : 3;
-            token.MaxHealth = token.BaseHealth;
-            token.CurrentHealth = token.BaseHealth;
-            token.Golden = golden;
-            // TODO: 立即攻击效果需要在 CombatSimulator 中处理
-            return new List<Minion> { token };
-        }
-    }
-
-    /// <summary>
-    /// Handless Forsaken 亡语：召唤一个 2/1 并具有复生
-    /// </summary>
-    public class HandlessForsakenDeathrattle : IDeathrattle
-    {
-        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
-        {
-            var factory = MinionFactoryCache.GetFactory();
-            var token = factory.CreateFromCardId("BG25_010t", source.ControlledByPlayer);
-            token.BaseAttack = golden ? 4 : 2;
-            token.BaseHealth = golden ? 2 : 1;
-            token.MaxHealth = token.BaseHealth;
-            token.CurrentHealth = token.BaseHealth;
-            token.Reborn = true;
-            token.Golden = golden;
-            return new List<Minion> { token };
-        }
+        public int GetPassiveHealthBonus(Minion self, CombatState state) => 0;
     }
 }
