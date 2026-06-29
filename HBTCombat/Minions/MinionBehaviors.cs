@@ -7,6 +7,9 @@ namespace HBTCombat
     /// <summary>
     /// 随从行为注册中心
     /// 集中注册所有有特殊行为的随从
+    ///
+    /// 注意：使用 BattlegroundDB 中的真实卡牌 ID
+    /// 数据驱动的亡语（有 ChildIds 的）会自动处理，这里只注册需要特殊逻辑的随从
     /// </summary>
     public static class MinionBehaviors
     {
@@ -15,10 +18,7 @@ namespace HBTCombat
         /// </summary>
         public static void RegisterAll()
         {
-            // === 亡语召唤类 ===
-            RegisterDeathrattleSummons();
-
-            // === 亡语效果类 ===
+            // === 亡语效果类（需要特殊逻辑）===
             RegisterDeathrattleEffects();
 
             // === 友方死亡触发类 ===
@@ -30,178 +30,76 @@ namespace HBTCombat
             // === 攻击后触发类 ===
             RegisterAfterAttack();
 
-            // === 被动加成类 ===
-            RegisterPassiveBonuses();
+            // === 友方召唤触发类 ===
+            RegisterOnFriendlyMinionSummoned();
 
             // === 复仇触发类 ===
             RegisterAvenge();
+
+            // === 被动加成类 ===
+            RegisterPassiveBonuses();
+
+            // === 自定义亡语召唤（特殊逻辑）===
+            RegisterSpecialDeathrattles();
         }
 
-        // ── 亡语召唤 ──
-
-        private static void RegisterDeathrattleSummons()
-        {
-            // Rat Pack: 亡语召唤等同于攻击力数量的 1/1 Rat
-            MinionFactory.RegisterDeathrattle("BG21_002", (m, p) => new List<IDeathrattle>
-            {
-                new RatPackDeathrattle()
-            });
-
-            // Infested Wolf: 亡语召唤两个 1/1 Spider
-            MinionFactory.RegisterDeathrattle("BG21_005", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_005t" }, 2, 4)
-            });
-
-            // Savannah Highmane: 亡语召唤两个 2/2 Hyena
-            MinionFactory.RegisterDeathrattle("BG21_006", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_006t" }, 2, 4)
-            });
-
-            // Kindly Grandmother: 亡语召唤 3/2 Big Bad Wolf
-            MinionFactory.RegisterDeathrattle("BG21_001", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_001t" }, 1, 2)
-            });
-
-            // Sewer Rat: 亡语召唤 2/3 Taunt
-            MinionFactory.RegisterDeathrattle("BG21_003", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_003t" }, 1, 2)
-            });
-
-            // Ghastcoiler: 亡语召唤 2 个随机亡语随从（简化为固定衍生物）
-            MinionFactory.RegisterDeathrattle("BG21_008", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_008t" }, 2, 4)
-            });
-
-            // Sneeds Old Shredder: 亡语召唤随机传说随从（简化）
-            MinionFactory.RegisterDeathrattle("BG21_009", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_009t" }, 1, 2)
-            });
-
-            // Imp Mama: 受到伤害时召唤恶魔（简化为亡语）
-            MinionFactory.RegisterDeathrattle("BG21_020", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_020t" }, 3, 6)
-            });
-
-            // Fiendish Servant: 亡语将攻击力随机分配给友方随从
-            MinionFactory.RegisterDeathrattle("BG21_021", (m, p) => new List<IDeathrattle>
-            {
-                new FiendishServantDeathrattle()
-            });
-
-            // Mechano-Egg: 亡语召唤 8/8 Robosaur
-            MinionFactory.RegisterDeathrattle("BG21_024", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_024t" }, 1, 2)
-            });
-
-            // Kaboom Bot: 亡语对随机敌方随从造成 4 伤害
-            MinionFactory.RegisterDeathrattleEffect("BG21_025", (m, p) => new List<IDeathrattleEffect>
-            {
-                new KaboomBotDeathrattleEffect()
-            });
-
-            // Harvest Golem: 亡语召唤 2/3 Damaged Golem
-            MinionFactory.RegisterDeathrattle("BG21_026", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_026t" }, 1, 2)
-            });
-
-            // Mecharoo: 亡语召唤 1/1 Jo-E Bot
-            MinionFactory.RegisterDeathrattle("BG21_027", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_027t" }, 1, 2)
-            });
-
-            // Replicating Menace: 亡语召唤三个 1/1 Microbot
-            MinionFactory.RegisterDeathrattle("BG21_030", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_030t" }, 3, 6)
-            });
-
-            // Imprisoner: 亡语召唤 1/1 Imp
-            MinionFactory.RegisterDeathrattle("BG21_031", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_031t" }, 1, 2)
-            });
-
-            // Voidlord: 亡语召唤三个 1/3 Voidwalker
-            MinionFactory.RegisterDeathrattle("BG21_032", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_032t" }, 3, 6)
-            });
-
-            // Imp Gang Boss: 受到伤害时召唤 1/1 Imp（简化）
-            MinionFactory.RegisterFriendlyMinionDied("BG21_033", (m, p) => new List<IOnFriendlyMinionDied>
-            {
-                new ImpGangBossTrigger()
-            });
-
-            // Scallywag: 亡语召唤 1/1 Sky Pirate 并立即攻击
-            MinionFactory.RegisterDeathrattle("BG21_036", (m, p) => new List<IDeathrattle>
-            {
-                new ScallywagDeathrattle()
-            });
-
-            // Ring Matron: 亡语召唤两个 3/2 Imp
-            MinionFactory.RegisterDeathrattle("BG21_037", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG21_037t" }, 2, 4)
-            });
-
-            // Foul Egg: 亡语召唤 4/4 Foul Chicken
-            MinionFactory.RegisterDeathrattle("BG23_001", (m, p) => new List<IDeathrattle>
-            {
-                new GenericDeathrattle(m.Golden, new List<string> { "BG23_001t" }, 1, 2)
-            });
-        }
-
-        // ── 亡语效果 ──
+        // ═══════════════════════════════════════════════════════════════
+        // 亡语效果类（非召唤）
+        // ═══════════════════════════════════════════════════════════════
 
         private static void RegisterDeathrattleEffects()
         {
-            // Goldrinn: 亡语给所有友方野兽 +4/+4
-            MinionFactory.RegisterDeathrattleEffect("BG21_007", (m, p) => new List<IDeathrattleEffect>
+            // Goldrinn, the Great Wolf (T6): 给所有友方野兽 +8/+8
+            MinionFactory.RegisterDeathrattleEffect("BGS_018", (m, p) => new List<IDeathrattleEffect>
             {
                 new GoldrinnDeathrattleEffect()
             });
 
-            // Spawn of NZoth: 亡语给所有友方随从 +1/+1
-            MinionFactory.RegisterDeathrattleEffect("BG21_040", (m, p) => new List<IDeathrattleEffect>
+            // Scarlet Skull (T2): +1/+2 to a friendly Undead
+            MinionFactory.RegisterDeathrattleEffect("BG25_022", (m, p) => new List<IDeathrattleEffect>
             {
-                new SpawnOfNZothDeathrattleEffect()
+                new ScarletSkullDeathrattleEffect()
             });
 
-            // Selfless Hero: 亡语给一个随机友方随从圣盾
-            MinionFactory.RegisterDeathrattleEffect("BG21_041", (m, p) => new List<IDeathrattleEffect>
-            {
-                new SelflessHeroDeathrattleEffect()
-            });
+            // Spiked Savior (T5): +1 health to all friendly minions AND deals 1 damage to each
+            // TODO: 需要实现
 
-            // Unstable Ghoul: 亡语对所有随从造成 1 伤害
-            MinionFactory.RegisterDeathrattleEffect("BG21_042", (m, p) => new List<IDeathrattleEffect>
-            {
-                new UnstableGhoulDeathrattleEffect()
-            });
-
-            // Tunnel Blaster: 亡语对所有随从造成 3 伤害
-            MinionFactory.RegisterDeathrattleEffect("BG21_043", (m, p) => new List<IDeathrattleEffect>
+            // Tunnel Blaster (T4): deals 3 damage to all minions
+            MinionFactory.RegisterDeathrattleEffect("BG_DAL_775", (m, p) => new List<IDeathrattleEffect>
             {
                 new TunnelBlasterDeathrattleEffect()
             });
+
+            // Silent Enforcer (T4): deals 2 damage to all minions (except friendly demons)
+            MinionFactory.RegisterDeathrattleEffect("BG33_156", (m, p) => new List<IDeathrattleEffect>
+            {
+                new SilentEnforcerDeathrattleEffect()
+            });
+
+            // Baneling (T2): deals damage equal to its attack to a random enemy
+            MinionFactory.RegisterDeathrattleEffect("BG31_HERO_811t5", (m, p) => new List<IDeathrattleEffect>
+            {
+                new BanelingDeathrattleEffect()
+            });
+
+            // Leeroy the Reckless (T5): destroys the minion that killed it
+            // TODO: 需要跟踪击杀者，暂时跳过
+
+            // Plaguerunner (T4): +1/+1 to a random friendly minion for each minion that died this combat
+            MinionFactory.RegisterDeathrattleEffect("BG34_690", (m, p) => new List<IDeathrattleEffect>
+            {
+                new PlaguerunnerDeathrattleEffect()
+            });
         }
 
-        // ── 友方死亡触发 ──
+        // ═══════════════════════════════════════════════════════════════
+        // 友方死亡触发
+        // ═══════════════════════════════════════════════════════════════
 
         private static void RegisterOnFriendlyMinionDied()
         {
             // Scavenging Hyena: 当友方野兽死亡时获得 +2/+1
+            // CardId: BG21_044 (可能已过期，需要验证)
             MinionFactory.RegisterFriendlyMinionDied("BG21_044", (m, p) => new List<IOnFriendlyMinionDied>
             {
                 new ScavengingHyenaTrigger()
@@ -218,35 +116,71 @@ namespace HBTCombat
             {
                 new FlesheatingGhoulTrigger()
             });
+
+            // Imp Gang Boss: 受到伤害时召唤 1/1 Imp
+            MinionFactory.RegisterFriendlyMinionDied("BG21_033", (m, p) => new List<IOnFriendlyMinionDied>
+            {
+                new ImpGangBossTrigger()
+            });
+
+            // Elementium Squirrel Bomb (T4): deals 4 damage per friendly mech that died this combat
+            MinionFactory.RegisterDeathrattleEffect("TB_BaconShop_HERO_17_Buddy", (m, p) => new List<IDeathrattleEffect>
+            {
+                new ElementiumSquirrelBombDeathrattleEffect()
+            });
+
+            // Ingenious Inventor (T5): +1/+1 for each friendly minion that died this combat
+            MinionFactory.RegisterDeathrattleEffect("BG35_890", (m, p) => new List<IDeathrattleEffect>
+            {
+                new IngeniousInventorDeathrattleEffect()
+            });
         }
 
-        // ── 战斗开始触发 ──
+        // ═══════════════════════════════════════════════════════════════
+        // 战斗开始触发
+        // ═══════════════════════════════════════════════════════════════
 
         private static void RegisterStartOfCombat()
         {
             // Red Whelp: 战斗开始时每有一条龙造成 1 伤害
+            // CardId: BG21_050 (可能已过期)
             MinionFactory.RegisterStartOfCombat("BG21_050", (m, p) => new List<IOnStartOfCombat>
             {
                 new RedWhelpTrigger()
             });
+
+            // Spirit of Air (T1): gives a random friendly minion Windfury, Divine Shield, and Taunt
+            MinionFactory.RegisterStartOfCombat("TB_BaconShop_HERO_76_Buddy", (m, p) => new List<IOnStartOfCombat>
+            {
+                new SpiritOfAirTrigger()
+            });
+
+            // Dozy Whelp: 战斗开始时获得 +1 攻击（如果有其他龙）
+            // TODO: 需要实现
         }
 
-        // ── 攻击后触发 ──
+        // ═══════════════════════════════════════════════════════════════
+        // 攻击后触发
+        // ═══════════════════════════════════════════════════════════════
 
         private static void RegisterAfterAttack()
         {
             // Monstrous Macaw: 攻击后触发友方随从的亡语
+            // CardId: BG21_060 (可能已过期)
             MinionFactory.RegisterAfterAttack("BG21_060", (m, p) => new List<IOnAfterAttack>
             {
                 new MonstrousMacawTrigger()
             });
         }
 
-        // ── 被动加成 ──
+        // ═══════════════════════════════════════════════════════════════
+        // 友方召唤触发
+        // ═══════════════════════════════════════════════════════════════
 
-        private static void RegisterPassiveBonuses()
+        private static void RegisterOnFriendlyMinionSummoned()
         {
             // Mama Bear: 召唤野兽时给予 +4/+4
+            // CardId: BG21_061 (可能已过期)
             MinionFactory.RegisterFriendlyMinionSummoned("BG21_061", (m, p) => new List<IOnFriendlyMinionSummoned>
             {
                 new MamaBearTrigger()
@@ -258,104 +192,81 @@ namespace HBTCombat
                 new PackLeaderTrigger()
             });
 
+            // Khadgar: 你的卡牌召唤随从时召唤 2 个副本
+            // TODO: 需要实现（复杂，需要修改召唤逻辑）
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // 复仇触发
+        // ═══════════════════════════════════════════════════════════════
+
+        private static void RegisterAvenge()
+        {
+            // Baron Rivendare: 你的亡语触发两次
+            // TODO: 需要实现（需要修改亡语触发逻辑）
+
+            // Brann Bronzebeard: 你的战吼触发两次
+            // TODO: 战斗中不适用
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // 被动加成
+        // ═══════════════════════════════════════════════════════════════
+
+        private static void RegisterPassiveBonuses()
+        {
             // Mal'Ganis: 友方恶魔获得 +2/+2
+            // CardId: BG21_063 (可能已过期)
             MinionFactory.RegisterPassiveAttackBonus("BG21_063", (m, p) => new MalGanisAttackBonus());
             MinionFactory.RegisterPassiveHealthBonus("BG21_063", (m, p) => new MalGanisHealthBonus());
 
-            // Kalecgos: 友方龙获得 +1/+1（简化）
+            // Kalecgos: 友方龙获得 +1/+1
             MinionFactory.RegisterPassiveAttackBonus("BG21_064", (m, p) => new KalecgosAttackBonus());
             MinionFactory.RegisterPassiveHealthBonus("BG21_064", (m, p) => new KalecgosHealthBonus());
         }
 
-        // ── 复仇触发 ──
+        // ═══════════════════════════════════════════════════════════════
+        // 特殊亡语召唤（需要自定义逻辑）
+        // ═══════════════════════════════════════════════════════════════
 
-        private static void RegisterAvenge()
+        private static void RegisterSpecialDeathrattles()
         {
-            // 示例：复仇效果随从
-            // 这里可以添加复仇触发的随从
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // 亡语实现
-    // ═══════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Rat Pack 亡语：召唤等同于攻击力数量的 1/1 Rat
-    /// </summary>
-    public class RatPackDeathrattle : IDeathrattle
-    {
-        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
-        {
-            int count = source.BaseAttack;
-            if (golden) count *= 2;
-            var result = new List<Minion>();
-            var factory = MinionFactoryCache.GetFactory();
-            for (int i = 0; i < count; i++)
+            // Sly Raptor (T3): summons a random beast with stats set to 6/6
+            MinionFactory.RegisterDeathrattle("BG25_806", (m, p) => new List<IDeathrattle>
             {
-                var rat = factory.CreateFromCardId("BG21_002t", source.ControlledByPlayer);
-                rat.Golden = golden;
-                result.Add(rat);
-            }
-            return result;
+                new SlyRaptorDeathrattle()
+            });
+
+            // Kangor's Apprentice (T5): summons copies of the first 2 mechs that died
+            // TODO: 需要跟踪死亡顺序
+
+            // Twilight Hatchling (T1): summons a 3/3 that attacks immediately
+            MinionFactory.RegisterDeathrattle("BG34_630", (m, p) => new List<IDeathrattle>
+            {
+                new TwilightHatchlingDeathrattle()
+            });
+
+            // Handless Forsaken (T3): summons a 2/1 with Reborn
+            MinionFactory.RegisterDeathrattle("BG25_010", (m, p) => new List<IDeathrattle>
+            {
+                new HandlessForsakenDeathrattle()
+            });
         }
     }
 
-    /// <summary>
-    /// Fiendish Servant 亡语：将攻击力随机分配给友方随从
-    /// </summary>
-    public class FiendishServantDeathrattle : IDeathrattle
-    {
-        private static readonly Random Rng = new Random();
-
-        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
-        {
-            // 这个效果需要在战斗状态中处理，返回空列表
-            // 实际效果在 CombatSimulator 中特殊处理
-            return new List<Minion>();
-        }
-    }
+    // ═══════════════════════════════════════════════════════════════════════
+    // 亡语效果实现
+    // ═══════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Kaboom Bot 亡语：对随机敌方随从造成 4 伤害
-    /// </summary>
-    public class KaboomBotDeathrattleEffect : IDeathrattleEffect
-    {
-        private static readonly Random Rng = new Random();
-
-        public void Trigger(Minion source, CombatState state)
-        {
-            int damage = source.Golden ? 8 : 4;
-            var enemyBoard = state.GetEnemyBoard(source);
-            if (enemyBoard.Count == 0) return;
-            var target = enemyBoard[Rng.Next(enemyBoard.Count)];
-            target.TakeDamage(damage);
-        }
-    }
-
-    /// <summary>
-    /// Scallywag 亡语：召唤 1/1 Sky Pirate 并立即攻击
-    /// </summary>
-    public class ScallywagDeathrattle : IDeathrattle
-    {
-        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
-        {
-            var factory = MinionFactoryCache.GetFactory();
-            var pirate = factory.CreateFromCardId("BG21_036t", source.ControlledByPlayer);
-            pirate.Golden = golden;
-            return new List<Minion> { pirate };
-        }
-    }
-
-    /// <summary>
-    /// Goldrinn 亡语：给所有友方野兽 +4/+4
+    /// Goldrinn 亡语：给所有友方野兽 +8/+8
     /// </summary>
     public class GoldrinnDeathrattleEffect : IDeathrattleEffect
     {
         public void Trigger(Minion source, CombatState state)
         {
-            int atkBonus = source.Golden ? 8 : 4;
-            int hpBonus = source.Golden ? 8 : 4;
+            int atkBonus = source.Golden ? 16 : 8;
+            int hpBonus = source.Golden ? 16 : 8;
             var friendlyBoard = state.GetFriendlyBoard(source);
             foreach (var m in friendlyBoard)
             {
@@ -370,62 +281,32 @@ namespace HBTCombat
     }
 
     /// <summary>
-    /// Spawn of NZoth 亡语：给所有友方随从 +1/+1
+    /// Scarlet Skull 亡语：+1/+2 to a friendly Undead
     /// </summary>
-    public class SpawnOfNZothDeathrattleEffect : IDeathrattleEffect
-    {
-        public void Trigger(Minion source, CombatState state)
-        {
-            int bonus = source.Golden ? 2 : 1;
-            var friendlyBoard = state.GetFriendlyBoard(source);
-            foreach (var m in friendlyBoard)
-            {
-                m.BaseAttack += bonus;
-                m.MaxHealth += bonus;
-                m.CurrentHealth += bonus;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Selfless Hero 亡语：给一个随机友方随从圣盾
-    /// </summary>
-    public class SelflessHeroDeathrattleEffect : IDeathrattleEffect
+    public class ScarletSkullDeathrattleEffect : IDeathrattleEffect
     {
         private static readonly Random Rng = new Random();
 
         public void Trigger(Minion source, CombatState state)
         {
-            int count = source.Golden ? 2 : 1;
+            int atkBonus = source.Golden ? 2 : 1;
+            int hpBonus = source.Golden ? 4 : 2;
+
             var friendlyBoard = state.GetFriendlyBoard(source);
-            var candidates = new List<Minion>();
+            var undead = new List<Minion>();
             foreach (var m in friendlyBoard)
             {
-                if (m != source && !m.DivineShield)
-                    candidates.Add(m);
+                if (m.PrimaryRace == "Undead" && m != source)
+                    undead.Add(m);
             }
 
-            for (int i = 0; i < count && candidates.Count > 0; i++)
+            if (undead.Count > 0)
             {
-                int idx = Rng.Next(candidates.Count);
-                candidates[idx].DivineShield = true;
-                candidates.RemoveAt(idx);
+                var target = undead[Rng.Next(undead.Count)];
+                target.BaseAttack += atkBonus;
+                target.MaxHealth += hpBonus;
+                target.CurrentHealth += hpBonus;
             }
-        }
-    }
-
-    /// <summary>
-    /// Unstable Ghoul 亡语：对所有随从造成 1 伤害
-    /// </summary>
-    public class UnstableGhoulDeathrattleEffect : IDeathrattleEffect
-    {
-        public void Trigger(Minion source, CombatState state)
-        {
-            int damage = source.Golden ? 2 : 1;
-            foreach (var m in state.PlayerBoard)
-                m.TakeDamage(damage);
-            foreach (var m in state.OpponentBoard)
-                m.TakeDamage(damage);
         }
     }
 
@@ -444,9 +325,108 @@ namespace HBTCombat
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    /// <summary>
+    /// Silent Enforcer 亡语：对所有非友方恶魔的随从造成 2 伤害
+    /// </summary>
+    public class SilentEnforcerDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? 4 : 2;
+            var friendlyBoard = state.GetFriendlyBoard(source);
+            var enemyBoard = state.GetEnemyBoard(source);
+
+            // 对友方非恶魔随从造成伤害
+            foreach (var m in friendlyBoard)
+            {
+                if (m.PrimaryRace != "Demon")
+                    m.TakeDamage(damage);
+            }
+
+            // 对所有敌方随从造成伤害
+            foreach (var m in enemyBoard)
+                m.TakeDamage(damage);
+        }
+    }
+
+    /// <summary>
+    /// Baneling 亡语：对随机敌方随从造成等同于攻击力的伤害
+    /// </summary>
+    public class BanelingDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+
+        public void Trigger(Minion source, CombatState state)
+        {
+            int damage = source.Golden ? source.BaseAttack * 2 : source.BaseAttack;
+            var enemyBoard = state.GetEnemyBoard(source);
+            if (enemyBoard.Count == 0) return;
+
+            var target = enemyBoard[Rng.Next(enemyBoard.Count)];
+            target.TakeDamage(damage);
+        }
+    }
+
+    /// <summary>
+    /// Plaguerunner 亡语：+1/+1 for each friendly minion that died this combat
+    /// </summary>
+    public class PlaguerunnerDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            // 需要跟踪死亡计数，暂时使用 ScriptDataNum1
+            int deaths = source.ScriptDataNum1;
+            int bonus = source.Golden ? deaths * 2 : deaths;
+
+            var friendlyBoard = state.GetFriendlyBoard(source);
+            foreach (var m in friendlyBoard)
+            {
+                m.BaseAttack += bonus;
+                m.MaxHealth += bonus;
+                m.CurrentHealth += bonus;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Elementium Squirrel Bomb 亡语：对随机敌方随从造成 4 伤害（每个友方机械死亡 +4）
+    /// </summary>
+    public class ElementiumSquirrelBombDeathrattleEffect : IDeathrattleEffect
+    {
+        private static readonly Random Rng = new Random();
+
+        public void Trigger(Minion source, CombatState state)
+        {
+            int mechDeaths = source.ScriptDataNum1;
+            int damage = source.Golden ? (mechDeaths + 1) * 8 : (mechDeaths + 1) * 4;
+
+            var enemyBoard = state.GetEnemyBoard(source);
+            if (enemyBoard.Count == 0) return;
+
+            var target = enemyBoard[Rng.Next(enemyBoard.Count)];
+            target.TakeDamage(damage);
+        }
+    }
+
+    /// <summary>
+    /// Ingenious Inventor 亡语：+1/+1 for each friendly minion that died this combat
+    /// </summary>
+    public class IngeniousInventorDeathrattleEffect : IDeathrattleEffect
+    {
+        public void Trigger(Minion source, CombatState state)
+        {
+            int deaths = source.ScriptDataNum1;
+            int bonus = source.Golden ? deaths * 2 : deaths;
+
+            source.BaseAttack += bonus;
+            source.MaxHealth += bonus;
+            source.CurrentHealth += bonus;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // 友方死亡触发实现
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════
 
     /// <summary>
     /// Scavenging Hyena: 当友方野兽死亡时获得 +2/+1
@@ -502,7 +482,6 @@ namespace HBTCombat
     {
         public void OnFriendlyMinionDied(Minion self, Minion dead, CombatState state)
         {
-            // 简化：当友方恶魔死亡时召唤 Imp
             if (dead.ControlledByPlayer == self.ControlledByPlayer && dead.PrimaryRace == "Demon")
             {
                 var factory = MinionFactoryCache.GetFactory();
@@ -517,9 +496,9 @@ namespace HBTCombat
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════
     // 战斗开始触发实现
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════
 
     /// <summary>
     /// Red Whelp: 战斗开始时每有一条龙造成 1 伤害
@@ -544,7 +523,6 @@ namespace HBTCombat
             var enemyBoard = state.GetEnemyBoard(self);
             if (enemyBoard.Count == 0) return;
 
-            // 对随机敌方随从造成伤害
             for (int i = 0; i < damage; i++)
             {
                 if (enemyBoard.Count == 0) break;
@@ -554,9 +532,37 @@ namespace HBTCombat
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    /// <summary>
+    /// Spirit of Air: gives a random friendly minion Windfury, Divine Shield, and Taunt
+    /// </summary>
+    public class SpiritOfAirTrigger : IOnStartOfCombat
+    {
+        private static readonly Random Rng = new Random();
+
+        public void OnStartOfCombat(Minion self, CombatState state)
+        {
+            var friendlyBoard = state.GetFriendlyBoard(self);
+            if (friendlyBoard.Count == 0) return;
+
+            var candidates = new List<Minion>();
+            foreach (var m in friendlyBoard)
+            {
+                if (m != self)
+                    candidates.Add(m);
+            }
+
+            if (candidates.Count == 0) return;
+
+            var target = candidates[Rng.Next(candidates.Count)];
+            target.Windfury = true;
+            target.DivineShield = true;
+            target.Taunt = true;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // 攻击后触发实现
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════
 
     /// <summary>
     /// Monstrous Macaw: 攻击后触发友方随从的亡语
@@ -567,20 +573,21 @@ namespace HBTCombat
 
         public void OnAfterAttack(Minion self, Minion attacker, Minion target, CombatState state)
         {
-            if (attacker != self) return; // 只在自己攻击时触发
+            if (attacker != self) return;
 
             var friendlyBoard = state.GetFriendlyBoard(self);
             var deathrattleMinions = new List<Minion>();
             foreach (var m in friendlyBoard)
             {
-                if (m != self && m.Deathrattles.Count > 0)
+                if (m != self && (m.Deathrattles.Count > 0 || m.DeathrattleEffects.Count > 0))
                     deathrattleMinions.Add(m);
             }
 
             if (deathrattleMinions.Count == 0) return;
 
             var chosen = deathrattleMinions[Rng.Next(deathrattleMinions.Count)];
-            // 触发选中随从的亡语
+
+            // 触发召唤类亡语
             foreach (var dr in chosen.Deathrattles)
             {
                 var summons = dr.TriggerDeathrattle(chosen, chosen.Golden);
@@ -593,12 +600,18 @@ namespace HBTCombat
                     }
                 }
             }
+
+            // 触发效果类亡语
+            foreach (var effect in chosen.DeathrattleEffects)
+            {
+                effect.Trigger(chosen, state);
+            }
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 友方随从召唤触发实现
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════
+    // 友方召唤触发实现
+    // ═══════════════════════════════════════════════════════════════════════
 
     /// <summary>
     /// Mama Bear: 召唤野兽时给予 +4/+4
@@ -633,18 +646,14 @@ namespace HBTCombat
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════
     // 被动加成实现
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════
 
-    /// <summary>
-    /// Mal'Ganis: 友方恶魔获得 +2/+2
-    /// </summary>
     public class MalGanisAttackBonus : IPassiveAttackBonus
     {
         public int GetPassiveAttackBonus(Minion self, CombatState state)
         {
-            // Mal'Ganis 自己不获得加成
             return 0;
         }
     }
@@ -657,9 +666,6 @@ namespace HBTCombat
         }
     }
 
-    /// <summary>
-    /// Kalecgos: 友方龙获得 +1/+1
-    /// </summary>
     public class KalecgosAttackBonus : IPassiveAttackBonus
     {
         public int GetPassiveAttackBonus(Minion self, CombatState state)
@@ -673,6 +679,69 @@ namespace HBTCombat
         public int GetPassiveHealthBonus(Minion self, CombatState state)
         {
             return 0;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 特殊亡语召唤实现
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Sly Raptor 亡语：召唤一个随机野兽，属性设为 6/6
+    /// </summary>
+    public class SlyRaptorDeathrattle : IDeathrattle
+    {
+        private static readonly Random Rng = new Random();
+
+        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
+        {
+            // 简化：召唤一个 6/6 的野兽 token
+            var factory = MinionFactoryCache.GetFactory();
+            var token = factory.CreateFromCardId("BG25_806t", source.ControlledByPlayer);
+            token.BaseAttack = golden ? 12 : 6;
+            token.BaseHealth = golden ? 12 : 6;
+            token.MaxHealth = token.BaseHealth;
+            token.CurrentHealth = token.BaseHealth;
+            token.Golden = golden;
+            return new List<Minion> { token };
+        }
+    }
+
+    /// <summary>
+    /// Twilight Hatchling 亡语：召唤一个 3/3 并立即攻击
+    /// </summary>
+    public class TwilightHatchlingDeathrattle : IDeathrattle
+    {
+        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
+        {
+            var factory = MinionFactoryCache.GetFactory();
+            var token = factory.CreateFromCardId("BG34_630t", source.ControlledByPlayer);
+            token.BaseAttack = golden ? 6 : 3;
+            token.BaseHealth = golden ? 6 : 3;
+            token.MaxHealth = token.BaseHealth;
+            token.CurrentHealth = token.BaseHealth;
+            token.Golden = golden;
+            // TODO: 立即攻击效果需要在 CombatSimulator 中处理
+            return new List<Minion> { token };
+        }
+    }
+
+    /// <summary>
+    /// Handless Forsaken 亡语：召唤一个 2/1 并具有复生
+    /// </summary>
+    public class HandlessForsakenDeathrattle : IDeathrattle
+    {
+        public List<Minion> TriggerDeathrattle(Minion source, bool golden)
+        {
+            var factory = MinionFactoryCache.GetFactory();
+            var token = factory.CreateFromCardId("BG25_010t", source.ControlledByPlayer);
+            token.BaseAttack = golden ? 4 : 2;
+            token.BaseHealth = golden ? 2 : 1;
+            token.MaxHealth = token.BaseHealth;
+            token.CurrentHealth = token.BaseHealth;
+            token.Reborn = true;
+            token.Golden = golden;
+            return new List<Minion> { token };
         }
     }
 }
