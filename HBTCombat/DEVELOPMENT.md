@@ -521,3 +521,64 @@ public void OnSomeEvent(Minion self, CombatState state)
 - [BobsBuddy 分析](../../HDT_Reverse/BobsBuddy_analysis.txt) - BobsBuddy 架构参考
 - [BattlegroundDB 源码](../../BattlegroundDB/) - 卡牌数据模型
 - [HDT BobsBuddyUtils](../../Hearthstone-Deck-Tracker/Hearthstone%20Deck%20Tracker/BobsBuddy/BobsBuddyUtils.cs) - HDT 到 BobsBuddy 的桥接参考
+
+---
+
+## 当前覆盖情况 (2024 年版本)
+
+### 手动注册的随从 (~20 个)
+
+**亡语效果:**
+- Goldrinn (T6): 给所有友方野兽 +8/+8
+- Scarlet Skull (T2): +1/+2 to a friendly Undead
+- Tunnel Blaster (T4): 对所有随从造成 3 伤害
+- Silent Enforcer (T4): 对所有非恶魔随从造成 2 伤害
+- Baneling (T2): 对随机敌方造成等同于攻击力的伤害
+- Plaguerunner (T4): +1/+1 for each friendly minion that died
+- Elementium Squirrel Bomb (T4): 4 damage per friendly mech that died
+- Ingenious Inventor (T5): +1/+1 for each friendly minion that died
+
+**友方死亡触发:**
+- Scavenging Hyena: 友方野兽死亡 +2/+1
+- Junkbot: 友方机械死亡 +2/+2
+- Flesheating Ghoul: 任意随从死亡 +1 攻击
+- Imp Gang Boss: 友方恶魔死亡召唤 Imp
+
+**战斗开始:**
+- Red Whelp: 每条龙造成 1 伤害
+- Spirit of Air: 给随机友方 Windfury+DivineShield+Taunt
+
+**攻击后:**
+- Monstrous Macaw: 触发友方亡语
+
+**召唤触发:**
+- Mama Bear: 召唤野兽 +4/+4
+- Pack Leader: 召唤野兽 +3 攻击
+
+**特殊亡语:**
+- Sly Raptor: 召唤 6/6 野兽
+- Twilight Hatchling: 召唤 3/3 并立即攻击
+- Handless Forsaken: 召唤 2/1 并具有复生
+
+### 数据驱动 (47 个)
+
+有 ChildIds 的亡语随从会自动通过 DataDrivenBehaviors 创建 GenericDeathrattle。这些随从不需要手动实现。
+
+### 关键词系统
+
+所有具有以下关键词的随由 CombatSimulator 自动处理:
+- Taunt (39 个)
+- Divine Shield (28 个)
+- Windfury (6 个)
+- Reborn (11 个)
+- Venomous (7 个)
+
+### 待实现
+
+- Leeroy the Reckless: 摧毁击杀者
+- Kangor's Apprentice: 复制前 2 个死亡的机械
+- Baron Rivendare: 亡语触发两次
+- Khadgar: 召唤随从时召唤 2 个副本
+- Rylak Metalhead: 触发相邻随从的战吼
+- Timewarped Warghoul: 触发相邻随从的亡语
+- 更多 Timewarped 随从的特殊行为
