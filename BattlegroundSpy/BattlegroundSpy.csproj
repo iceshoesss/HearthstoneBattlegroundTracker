@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
-    <PlatformTarget>x86</PlatformTarget>
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <LangVersion>10</LangVersion>
     <RootNamespace>BattlegroundSpy</RootNamespace>
     <AssemblyName>BattlegroundSpy</AssemblyName>
