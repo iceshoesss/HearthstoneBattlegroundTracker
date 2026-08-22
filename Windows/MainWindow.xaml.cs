@@ -79,12 +79,34 @@ public partial class MainWindow : Window
         AppendLog("联赛工具已启动");
     }
 
+    private bool _fadeCloseStarted;
+    private bool _realClose;
+
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        // 渐隐完成后的第二次 Close：放行，让 WPF 正常销毁窗口并自然退出应用
+        if (_realClose) return;
+
         e.Cancel = true;
+        // 渐隐进行中忽略重复关闭请求（连点 X / Alt+F4），避免动画从 1 重播
+        if (_fadeCloseStarted) return;
+        _fadeCloseStarted = true;
+
         var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0,
-            TimeSpan.FromMilliseconds(150));
-        fadeOut.Completed += (_, _) => Environment.Exit(0);
+            TimeSpan.FromMilliseconds(200))
+        {
+            EasingFunction = new System.Windows.Media.Animation.QuadraticEase
+            {
+                EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut
+            }
+        };
+        fadeOut.Completed += (_, _) =>
+        {
+            // 不用 Environment.Exit：进程暴毙会让分层窗口表面残留为纯黑矩形。
+            // 走正常 Close → OnLastWindowClose 自然退出，后台线程均为 IsBackground 会随之结束。
+            _realClose = true;
+            Close();
+        };
         BeginAnimation(OpacityProperty, fadeOut);
     }
 
