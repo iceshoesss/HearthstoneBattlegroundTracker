@@ -1,12 +1,17 @@
 @import 'tailwindcss';
 
-/* 深色主题基底 */
+/* ═══════════ ChunkFive 数字字体（与桌面版一致） ═══════════ */
+@font-face {
+  font-family: 'Chunkfive';
+  src: url('/fonts/Chunkfive.otf') format('opentype');
+}
+
 html {
   color-scheme: dark;
 }
 
 body {
-  @apply bg-[#0f1115] text-zinc-200 antialiased;
+  @apply bg-[#0d0a06] text-zinc-200 antialiased;
   font-family:
     'Segoe UI',
     system-ui,
@@ -15,14 +20,37 @@ body {
     sans-serif;
 }
 
-/* 纤细滚动条 */
+/* ═══════════ 桌面版同款配色 ═══════════ */
+.wood-frame {
+  background: linear-gradient(180deg, #6b4a26, #4a3319 50%, #3a2712);
+}
+.panel-bg {
+  background: linear-gradient(180deg, #2a1c0d, #1d1308);
+}
+.felt-bg {
+  background: radial-gradient(ellipse at 50% 35%, #5a4174, #45305c 60%, #342347);
+}
+.parchment {
+  background: linear-gradient(180deg, #efe5c4, #d6c69a);
+}
+
+/* 斜角横幅：外层金棕描边 + 内层渐变（双层模拟描边） */
+.banner-shape-outer {
+  clip-path: polygon(0 50%, 8% 0, 92% 0, 100% 50%, 92% 100%, 8% 100%);
+  background: #b08d4f;
+}
+.banner-shape-inner {
+  clip-path: polygon(0 50%, 8% 0, 92% 0, 100% 50%, 92% 100%, 8% 100%);
+  background: linear-gradient(180deg, #39456f, #232c4d);
+}
+
+/* ═══════════ 纤细金色滚动条 ═══════════ */
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(185, 154, 94, 0.4) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
-  height: 8px;
 }
 *::-webkit-scrollbar-thumb {
   border-radius: 4px;
@@ -32,15 +60,49 @@ body {
   background: rgba(255, 215, 94, 0.7);
 }
 
-/* 卡牌悬停浮起 */
-.card-tile {
+/* ═══════════ 随从卡（256 画布等比缩放，与桌面版同一套坐标） ═══════════ */
+.minion-card {
   transition:
     transform 0.18s ease,
-    box-shadow 0.18s ease;
+    filter 0.18s ease;
 }
-.card-tile:hover {
+.minion-card:hover {
   transform: translateY(-3px) scale(1.03);
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.55),
-    0 0 14px rgba(255, 215, 94, 0.25);
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
+}
+
+.canvas-256 {
+  position: absolute;
+  width: 256px;
+  height: 256px;
+  transform: scale(0.640625); /* 164 / 256，与桌面 Viewbox 一致 */
+  transform-origin: top left;
+}
+
+/* 覆盖 Tailwind preflight 的 max-width:100%/height:auto：
+   桌面坐标中覆盖层（300×350）必须允许超出 256 画布，否则全部变形 */
+.canvas-256 img {
+  display: block;
+  max-width: none;
+}
+
+.overlay-img {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* 属性数字：ChunkFive + 四向黑描边（模拟 WPF OutlinedText，顶部对齐同桌面） */
+.stat-num {
+  position: absolute;
+  width: 75px;
+  text-align: center;
+  font-family: 'Chunkfive', 'Arial Black', sans-serif;
+  font-size: 45px;
+  color: #fff;
+  text-shadow:
+    1.5px 0 #000,
+    -1.5px 0 #000,
+    0 1.5px #000,
+    0 -1.5px #000,
+    0 0 4px rgba(0, 0, 0, 0.9);
 }
