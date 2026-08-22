@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using BattlegroundDB;
 using HBT.Services;
@@ -38,18 +39,46 @@ public partial class MainWindow : Window
     // 与主工程 OverlayWindow 相同的 256x 图源；原图解码 + 跳过 ETag 校验（批量浏览提速）
     private readonly ImageCacheService _imgCache256 = new("256x", decodePixelWidth: 0, verifyEtags: false);
 
+    // 大图预览渲染缓存（bgs 全卡渲染，与 master 查询器一致）
+    private readonly ImageCacheService _renderCache = new(
+        "https://art.hearthstonejson.com/v1/bgs/latest/zhCN/512x", "bgs_zhCN_512x", "png", decodePixelWidth: 256);
+
     private int? _activeTier;
-    private string _activeRace;   // null=全部, Title Case 种族, "NEUTRAL"
+    private string _activeRace;     // null=全部, Title Case 种族, "NEUTRAL"
+    private string _activeKeyword;  // null=不限
+    private MinionVM _pendingPreview;
+    private readonly System.Windows.Threading.DispatcherTimer _previewTimer;
+
+    /// <summary>关键词（中文 → BgdbCard 关键词）</summary>
+    private static readonly (string cn, string[] en)[] KeywordMap =
+    {
+        ("战吼",     new[] { "Battlecry" }),
+        ("亡语",     new[] { "Deathrattle" }),
+        ("复生",     new[] { "Reborn" }),
+        ("圣盾",     new[] { "Divine Shield" }),
+        ("烈毒",     new[] { "Venomous" }),
+        ("剧毒",     new[] { "Poisonous" }),
+        ("风怒",     new[] { "Windfury", "Mega-Windfury" }),
+        ("嘲讽",     new[] { "Taunt" }),
+        ("光环",     new[] { "Aura" }),
+        ("回合开始", new[] { "Start of Turn" }),
+        ("回合结束", new[] { "End of Turn" }),
+    };
 
     public MainWindow()
     {
         InitializeComponent();
+        _previewTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        _previewTimer.Tick += PreviewTimer_Tick;
+        SectionsView.PreviewMouseMove += CardArea_MouseMove;
+        SectionsView.MouseLeave += CardArea_MouseLeave;
         Loaded += async (_, _) =>
         {
             // 数据库加载较重，移出 UI 线程避免窗口假死
             await Task.Run(() => _db.EnsureLoaded());
             BuildTierFilters();
             BuildRaceFilters();
+            BuildKeywordFilters();
             ApplyFilters();
         };
     }
@@ -84,6 +113,29 @@ public partial class MainWindow : Window
         foreach (var r in races)
             AddCircleButton(CardDatabaseService.GetRaceChinese(r), r, MakeIconVisual(TribeIcons[r]));
         AddCircleButton("中立", "NEUTRAL", MakeNeutralVisual());
+    }
+
+    private void BuildKeywordFilters()
+    {
+        foreach (var (cn, _) in KeywordMap)
+        {
+            var btn = new ToggleButton { Style = (Style)FindResource("ChipBtn"), Content = cn, Tag = cn };
+            btn.Click += (_, _) =>
+            {
+                if (btn.IsChecked == true)
+                {
+                    foreach (var c in KeywordRow.Children.OfType<ToggleButton>())
+                        if (c != btn) c.IsChecked = false;
+                    _activeKeyword = cn;
+                }
+                else
+                {
+                    _activeKeyword = null;
+                }
+                ApplyFilters();
+            };
+            KeywordRow.Children.Add(btn);
+        }
     }
 
     private void AddCircleButton(string caption, string raceCode, UIElement visual)
@@ -211,6 +263,12 @@ public partial class MainWindow : Window
         else if (!string.IsNullOrEmpty(_activeRace))
             minions = minions.Where(m => m.MinionType == _activeRace).ToList();
 
+        if (!string.IsNullOrEmpty(_activeKeyword))
+        {
+            var ens = KeywordMap.First(k => k.cn == _activeKeyword).en;
+            minions = minions.Where(m => ens.Any(en => m.HasKeyword(en))).ToList();
+        }
+
         // 分组顺序: 全部(All) → 中立 → 各种族（与游戏内浏览器一致）
         int GroupOrder(string raw) => raw switch
         {
@@ -247,6 +305,7 @@ public partial class MainWindow : Window
         return new MinionVM
         {
             CardId = m.CardId ?? "",
+            GoldenCardId = _db.GetGoldenCardId(m.DbfIdGold) ?? (m.CardId ?? "") + "_G",
             Name = $"{m.NameZh ?? m.Name} （{CardDatabaseService.GetRaceChinese(m.MinionType ?? "")}）",
             TierIcon = $"pack://application:,,,/Resources/Tiers/tier-{Math.Max(1, m.Tier ?? 1)}.png",
             TauntVis = Has("Taunt") ? Visibility.Visible : Visibility.Collapsed,
@@ -294,6 +353,70 @@ public partial class MainWindow : Window
     }
 
     // ═══════════════════════════════════════════════
+    //  悬浮大图预览（普通 + 金色）
+    // ═══════════════════════════════════════════════
+
+    private void CardArea_MouseMove(object sender, MouseEventArgs e)
+    {
+        var vm = FindVMUnderMouse(e);
+        if (vm == null)
+        {
+            _previewTimer.Stop();
+            CardPreviewPopup.IsOpen = false;
+            _pendingPreview = null;
+            return;
+        }
+        if (vm == _pendingPreview && CardPreviewPopup.IsOpen) return;
+
+        _previewTimer.Stop();
+        _pendingPreview = vm;
+        _previewTimer.Start();
+    }
+
+    private void CardArea_MouseLeave(object sender, MouseEventArgs e)
+    {
+        _previewTimer.Stop();
+        _pendingPreview = null;
+        CardPreviewPopup.IsOpen = false;
+    }
+
+    private void PreviewTimer_Tick(object sender, EventArgs e)
+    {
+        _previewTimer.Stop();
+        var item = _pendingPreview;
+        if (item == null) return;
+
+        // 先同步上屏已缓存图，再异步刷新
+        NormalCardImage.Source = _renderCache.GetTileOrPlaceholder(item.CardId);
+        GoldenCardImage.Source = _renderCache.GetTileOrPlaceholder(item.GoldenCardId + "_triple");
+        CardPreviewPopup.IsOpen = true;
+        _ = LoadPreviewAsync(item);
+    }
+
+    private async Task LoadPreviewAsync(MinionVM item)
+    {
+        try
+        {
+            var normal = await _renderCache.GetTileAsync(item.CardId);
+            var golden = await _renderCache.GetTileAsync(item.GoldenCardId + "_triple");
+            NormalCardImage.Source = normal;
+            GoldenCardImage.Source = golden;
+        }
+        catch { }
+    }
+
+    private static MinionVM FindVMUnderMouse(MouseEventArgs e)
+    {
+        var hit = e.OriginalSource as DependencyObject;
+        while (hit != null)
+        {
+            if (hit is FrameworkElement fe && fe.DataContext is MinionVM vm) return vm;
+            hit = VisualTreeHelper.GetParent(hit);
+        }
+        return null;
+    }
+
+    // ═══════════════════════════════════════════════
     //  视图模型
     // ═══════════════════════════════════════════════
 
@@ -308,6 +431,7 @@ public partial class MainWindow : Window
         private ImageSource _image;
 
         public string CardId { get; set; } = "";
+        public string GoldenCardId { get; set; } = "";
         public string Name { get; set; } = "";
         public string TierIcon { get; set; } = "";
         public string AtkText { get; set; } = "";

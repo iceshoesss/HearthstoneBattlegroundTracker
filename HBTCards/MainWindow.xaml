@@ -185,8 +185,36 @@
             </Grid>
         </DataTemplate>
 
+        <!-- ═══════════ 关键词筛选 chip ═══════════ -->
+        <Style x:Key="ChipBtn" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                <Border x:Name="bd" Background="{StaticResource PanelBg}" BorderBrush="#77572e" BorderThickness="1"
+                        CornerRadius="4" Padding="8,3">
+                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      TextBlock.Foreground="#cbb98a" TextBlock.FontSize="12"/>
+                </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#ffe9a8"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#ffd75e"/>
+                                <Setter TargetName="bd" Property="Background" Value="#4a3410"/>
+                                <Setter TargetName="bd" Property="TextBlock.Foreground" Value="#ffd75e"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Window.Resources>
 
+    <Grid>
     <!-- ═══════════════ 木纹外框 ═══════════════ -->
     <Border Margin="14" CornerRadius="22" Background="{StaticResource WoodFrame}"
             BorderBrush="#241708" BorderThickness="2">
@@ -210,6 +238,13 @@
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
                         <UniformGrid x:Name="TierRow" Columns="2" Margin="14,8,14,0"/>
+                        <Grid Height="32" Margin="14,14,14,0">
+                            <Path Data="M0,6 L10,0 H110 L120,6 L110,12 H10 Z" Fill="{StaticResource BannerBg}"
+                                  Stroke="#b08d4f" StrokeThickness="1" Stretch="Uniform"/>
+                            <TextBlock Text="关 键 词" FontSize="13" FontWeight="Bold" Foreground="#e8d5a2"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                        <WrapPanel x:Name="KeywordRow" Margin="12,8,12,8"/>
                     </StackPanel>
                 </Border>
 
@@ -270,4 +305,17 @@
             </Grid>
         </Border>
     </Border>
+
+        <!-- ═══════════ 悬浮大图预览（普通 + 金色，1.5x） ═══════════ -->
+        <Popup x:Name="CardPreviewPopup" IsOpen="False" Placement="Mouse"
+               VerticalOffset="-210" HorizontalOffset="-588"
+               AllowsTransparency="True" StaysOpen="True" PopupAnimation="Fade">
+            <StackPanel Orientation="Horizontal" IsHitTestVisible="False">
+                <Image x:Name="NormalCardImage" Width="270" Height="405" Margin="0,0,8,0"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                <Image x:Name="GoldenCardImage" Width="270" Height="405"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+            </StackPanel>
+        </Popup>
+    </Grid>
 </Window>
