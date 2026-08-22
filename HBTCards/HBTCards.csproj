@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>10</LangVersion>
+    <NoWarn>CS8632;CS0649</NoWarn>
+    <RootNamespace>HBTCards</RootNamespace>
+    <AssemblyName>HBTCards</AssemblyName>
+    <Version>0.1.0</Version>
+    <Description>HBT 卡牌图鉴 - 酒馆战棋随从浏览器（独立版）</Description>
+  </PropertyGroup>
+
+  <!-- 复用主工程的数据层（单一源，Link 编译） -->
+  <ItemGroup>
+    <Compile Include="..\Services\CardDatabaseService.cs" Link="Services\CardDatabaseService.cs" />
+    <Compile Include="..\Services\ImageCacheService.cs" Link="Services\ImageCacheService.cs" />
+  </ItemGroup>
+
+  <!-- BattlegroundDB (HDT) 卡牌数据库 -->
+  <ItemGroup>
+    <Reference Include="BattlegroundDB">
+      <HintPath>..\Lib\BattlegroundDB.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="System.Net.Http" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <!-- 数据文件复制到输出目录 -->
+  <ItemGroup>
+    <Content Include="Data\cards.battlegrounds.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Data\bg_minions.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- 矢量皮肤用的位图资源 -->
+  <ItemGroup>
+    <Resource Include="Resources\TribeIcons\*.jpg" />
+    <Resource Include="Resources\Keywords\*.png" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,313 @@
+<Window x:Class="HBTCards.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="HBT 卡牌图鉴" Width="1560" Height="1000"
+        MinWidth="1200" MinHeight="760"
+        WindowStartupLocation="CenterScreen"
+        Background="#0d0a06">
+
+    <Window.Resources>
+
+        <!-- ═══════════ 阴影效果 ═══════════ -->
+        <DropShadowEffect x:Key="CardShadow" Color="#000" BlurRadius="6" ShadowDepth="2" Opacity="0.55"/>
+        <DropShadowEffect x:Key="TextShadow" Color="#000" BlurRadius="3" ShadowDepth="1" Opacity="0.9"/>
+
+        <!-- ═══════════ 颜色 ═══════════ -->
+        <LinearGradientBrush x:Key="WoodFrame" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#6b4a26" Offset="0"/>
+            <GradientStop Color="#4a3319" Offset="0.5"/>
+            <GradientStop Color="#3a2712" Offset="1"/>
+        </LinearGradientBrush>
+        <RadialGradientBrush x:Key="FeltBg" Center="0.5,0.35" RadiusX="0.9" RadiusY="0.9">
+            <GradientStop Color="#5a4174" Offset="0"/>
+            <GradientStop Color="#45305c" Offset="0.6"/>
+            <GradientStop Color="#342347" Offset="1"/>
+        </RadialGradientBrush>
+        <LinearGradientBrush x:Key="PanelBg" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#2a1c0d" Offset="0"/>
+            <GradientStop Color="#1d1308" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="BannerBg" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#39456f" Offset="0"/>
+            <GradientStop Color="#232c4d" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="ShieldFill" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#b13fae" Offset="0"/>
+            <GradientStop Color="#7c2287" Offset="0.55"/>
+            <GradientStop Color="#57155f" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="MetalRing" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#e8ecef" Offset="0"/>
+            <GradientStop Color="#8b9099" Offset="0.5"/>
+            <GradientStop Color="#5c6068" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="Parchment" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#efe5c4" Offset="0"/>
+            <GradientStop Color="#d6c69a" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- ═══════════ 盾形等级按钮 ═══════════ -->
+        <Style x:Key="ShieldBtn" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid Width="78" Height="92" Background="Transparent">
+                            <Path x:Name="glow" Fill="#33ffd75e" Data="M2,2 H76 V52 C76,70 39,88 39,88 C39,88 2,70 2,52 Z"
+                                  Visibility="Collapsed"/>
+                            <Path x:Name="shield" Data="M6,6 H72 V52 C72,68 39,82 39,82 C39,82 6,68 6,52 Z"
+                                  Fill="{StaticResource ShieldFill}" Stroke="#9aa0ab" StrokeThickness="3.5"/>
+                            <Path Data="M12,11 H66 V26 H12 Z" Fill="#26ffffff"/>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              Margin="0,2,0,14" TextBlock.Foreground="#ffd75e"
+                                              TextBlock.FontSize="15" TextBlock.FontWeight="Bold"
+                                              TextBlock.TextAlignment="Center"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="shield" Property="Stroke" Value="#ffe9a8"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="shield" Property="Fill" Value="#5c1064"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="glow" Property="Visibility" Value="Visible"/>
+                                <Setter TargetName="shield" Property="Stroke" Value="#ffd75e"/>
+                                <Setter TargetName="shield" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect Color="#ffce54" BlurRadius="18" ShadowDepth="0" Opacity="0.9"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════ 圆形种族按钮 ═══════════ -->
+        <Style x:Key="CircleBtn" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid Width="76" Height="86" Background="Transparent">
+                            <Ellipse x:Name="halo" Fill="#22ffce54" Visibility="Collapsed"/>
+                            <Ellipse x:Name="ring" Stroke="#6b5433" StrokeThickness="3" Margin="6,6,6,16"/>
+                            <ContentPresenter Margin="9,9,9,19"/>
+                            <Border VerticalAlignment="Bottom" Background="#aa141008"
+                                    CornerRadius="4" Padding="4,1" HorizontalAlignment="Center" Margin="4">
+                                <TextBlock Text="{TemplateBinding Tag}" FontSize="10" Foreground="#d9c184"/>
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ring" Property="Stroke" Value="#ffe9a8"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="halo" Property="Visibility" Value="Visible"/>
+                                <Setter TargetName="ring" Property="Stroke" Value="#ffd75e"/>
+                                <Setter TargetName="ring" Property="StrokeThickness" Value="4"/>
+                                <Setter TargetName="ring" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect Color="#ffce54" BlurRadius="16" ShadowDepth="0" Opacity="0.95"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ═══════════ 关键词角标 ═══════════ -->
+        <DataTemplate x:Key="ChipTpl">
+            <Border Background="#cc100a18" CornerRadius="4" Padding="3" Margin="1.5" Height="22" MinWidth="22">
+                <Grid>
+                    <Image Source="{Binding Icon}" Visibility="{Binding IconVis}" Stretch="Uniform"/>
+                    <TextBlock Text="{Binding Text}" Visibility="{Binding TextVis}" FontSize="10"
+                               Foreground="#ffd75e" FontWeight="Bold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- ═══════════ 随从卡 ═══════════ -->
+        <DataTemplate x:Key="MinionTpl">
+            <Border x:Name="cardRoot" Width="164" Margin="5,4" CornerRadius="10" Background="#22000000"
+                    RenderTransformOrigin="0.5,0.5">
+                <Border.RenderTransform>
+                    <ScaleTransform ScaleX="1" ScaleY="1"/>
+                </Border.RenderTransform>
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="1.05" ScaleY="1.05"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid Height="238">
+                    <!-- 星级盾徽 -->
+                    <Path Panel.ZIndex="2" Data="M4,4 H46 V30 C46,41 25,49 25,49 C25,49 4,41 4,30 Z"
+                          Fill="{StaticResource ShieldFill}" Stroke="#9aa0ab" StrokeThickness="2.5"
+                          HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,6,0,0"
+                          Effect="{StaticResource CardShadow}"/>
+                    <TextBlock Panel.ZIndex="3" Text="{Binding StarsText}" FontSize="9" FontWeight="Bold"
+                               Foreground="#ffd75e" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="36"
+                               HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,12,0,0"/>
+                    <!-- 椭圆头像 -->
+                    <Ellipse Width="134" Height="152" VerticalAlignment="Top" Margin="0,34,0,0"
+                             Stroke="{StaticResource MetalRing}" StrokeThickness="4" Fill="#241833"/>
+                    <Image Width="126" Height="144" VerticalAlignment="Top" Margin="0,38,0,0"
+                           Stretch="UniformToFill" Source="{Binding Image}">
+                        <Image.Clip>
+                            <EllipseGeometry Center="63,72" RadiusX="63" RadiusY="72"/>
+                        </Image.Clip>
+                    </Image>
+                    <!-- 攻击水滴 -->
+                    <Path Data="M16,0 C22,9 32,17 32,26 A16,16 0 1,1 0,26 C0,17 10,9 16,0 Z"
+                          Fill="#f0b429" Stroke="#7a5210" StrokeThickness="2"
+                          HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10,0,0,26"
+                          Effect="{StaticResource CardShadow}"/>
+                    <TextBlock Text="{Binding Attack}" FontSize="15" FontWeight="ExtraBold" Foreground="#fff"
+                               HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="19,0,0,37"
+                               Effect="{StaticResource TextShadow}"/>
+                    <!-- 血量水滴 -->
+                    <Path Data="M16,0 C22,9 32,17 32,26 A16,16 0 1,1 0,26 C0,17 10,9 16,0 Z"
+                          Fill="#e04338" Stroke="#701209" StrokeThickness="2"
+                          HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,10,26"
+                          Effect="{StaticResource CardShadow}"/>
+                    <TextBlock Text="{Binding Health}" FontSize="15" FontWeight="ExtraBold" Foreground="#fff"
+                               HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,19,37"
+                               Effect="{StaticResource TextShadow}"/>
+                    <!-- 关键词角标行 -->
+                    <ItemsControl ItemsSource="{Binding Chips}" ItemTemplate="{StaticResource ChipTpl}"
+                                  HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,0">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <!-- ═══════════ 分组区头 ═══════════ -->
+        <DataTemplate x:Key="SectionHdrTpl">
+            <Grid Margin="30,14,30,4" Height="34">
+                <Rectangle Height="2" VerticalAlignment="Center" Margin="0,0,0,4">
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#00b99a5e" Offset="0"/>
+                            <GradientStop Color="#b99a5e" Offset="0.5"/>
+                            <GradientStop Color="#00b99a5e" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <TextBlock Text="❖" Foreground="#b99a5e" FontSize="11" VerticalAlignment="Center"
+                           HorizontalAlignment="Left" Margin="60,0,0,4"/>
+                <TextBlock Text="❖" Foreground="#b99a5e" FontSize="11" VerticalAlignment="Center"
+                           HorizontalAlignment="Right" Margin="0,0,60,4"/>
+                <Border Background="#45305c" Padding="26,4" VerticalAlignment="Center"
+                        HorizontalAlignment="Center" CornerRadius="3" Margin="0,0,0,4"
+                        BorderBrush="#b99a5e" BorderThickness="0,0,0,1">
+                    <TextBlock Text="{Binding}" FontSize="16" FontWeight="Bold" Foreground="#e3cf9b"/>
+                </Border>
+            </Grid>
+        </DataTemplate>
+
+
+    </Window.Resources>
+
+    <!-- ═══════════════ 木纹外框 ═══════════════ -->
+    <Border Margin="14" CornerRadius="22" Background="{StaticResource WoodFrame}"
+            BorderBrush="#241708" BorderThickness="2">
+        <Border CornerRadius="20" BorderBrush="#668a6a3f" BorderThickness="1" Margin="4" Padding="12">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="216"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="216"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- ───── 左：等级 ───── -->
+                <Border Grid.Column="0" CornerRadius="12" Background="{StaticResource PanelBg}"
+                        BorderBrush="#77572e" BorderThickness="1" Margin="0,0,10,0">
+                    <StackPanel>
+                        <Grid Height="36" Margin="14,12,14,4">
+                            <Path Data="M0,6 L10,0 H110 L120,6 L110,12 H10 Z" Fill="{StaticResource BannerBg}"
+                                  Stroke="#b08d4f" StrokeThickness="1" Stretch="Uniform"/>
+                            <TextBlock Text="等  级" FontSize="15" FontWeight="Bold" Foreground="#e8d5a2"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                        <UniformGrid x:Name="TierRow" Columns="2" Margin="10,8,10,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ───── 中：随从列表 ───── -->
+                <Border Grid.Column="1" CornerRadius="14" Background="{StaticResource FeltBg}"
+                        BorderBrush="#20142e" BorderThickness="2">
+                    <Grid Margin="0,0,0,8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="52"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- 标题牌匾 -->
+                        <Border Grid.Row="0" Width="430" Height="34" VerticalAlignment="Top"
+                                Background="{StaticResource Parchment}" CornerRadius="5"
+                                BorderBrush="#8a7345" BorderThickness="1" Margin="0,14,0,0"
+                                Effect="{StaticResource CardShadow}">
+                            <TextBlock Text="随 从" FontSize="16" FontWeight="Bold" Foreground="#3a2c18"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                      Padding="6,4,14,4">
+                            <ItemsControl x:Name="SectionsView">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel>
+                                            <ContentPresenter Content="{Binding Title}"
+                                                              ContentTemplate="{StaticResource SectionHdrTpl}"/>
+                                            <ItemsControl ItemsSource="{Binding Items}"
+                                                          ItemTemplate="{StaticResource MinionTpl}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel HorizontalAlignment="Center"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+                <!-- ───── 右：类型 ───── -->
+                <Border Grid.Column="2" CornerRadius="12" Background="{StaticResource PanelBg}"
+                        BorderBrush="#77572e" BorderThickness="1" Margin="10,0,0,0">
+                    <StackPanel>
+                        <Grid Height="36" Margin="14,12,14,4">
+                            <Path Data="M0,6 L10,0 H110 L120,6 L110,12 H10 Z" Fill="{StaticResource BannerBg}"
+                                  Stroke="#b08d4f" StrokeThickness="1" Stretch="Uniform"/>
+                            <TextBlock Text="类  型" FontSize="15" FontWeight="Bold" Foreground="#e8d5a2"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                        <UniformGrid x:Name="RaceRow" Columns="2" Margin="10,8,10,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+    </Border>
+</Window>
