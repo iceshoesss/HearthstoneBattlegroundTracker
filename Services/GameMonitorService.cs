@@ -99,6 +99,9 @@ public class GameMonitorService : IDisposable
     {
         _config = config;
         _hm = hm;
+        // BGSpy 连接状态可见化（此前只写 Console，WPF 窗口程序中不可见）
+        _hm.OnConnected += () => Log("BGSpy 已连接（内存读取就绪）");
+        _hm.OnDisconnected += () => Log("BGSpy 已断开");
         ApiClient.Init(config.ApiBaseUrl);
         GameStore.Init();
         _league = new LeagueClient(config);
@@ -924,6 +927,7 @@ public class GameMonitorService : IDisposable
     }
 
     private int _fetchFailCount;
+    private DateTime _lastFetchFailLog = DateTime.MinValue;
 
     private void TryFetchPlayerInfo()
     {
@@ -937,9 +941,16 @@ public class GameMonitorService : IDisposable
                 _fetchFailCount = 0;
                 Log($"玩家: {_localPlayerBattleTag}");
             }
-            else if (++_fetchFailCount % 50 == 1) // 每5秒打一次
+            else
             {
-                Log($"[DEBUG] GetBattleTag 返回 null (第{_fetchFailCount}次), IsConnected={_hm.IsConnected}");
+                ++_fetchFailCount;
+                // 时间节流：无论轮询节奏快慢，失败日志每 5 秒最多一条
+                // （原 %-50 写法假设 100ms 轮询，实际无日志阶段是 3s/次，导致长时间静默）
+                if ((DateTime.Now - _lastFetchFailLog).TotalSeconds >= 5)
+                {
+                    _lastFetchFailLog = DateTime.Now;
+                    Log($"[DEBUG] GetBattleTag 返回 null (第{_fetchFailCount}次), IsConnected={_hm.IsConnected}");
+                }
             }
         }
 

@@ -15,6 +15,7 @@ namespace HBT.Services
 public class HearthMirrorService : IDisposable
 {
     private readonly System.Threading.Timer _reconnectTimer;
+    private readonly object _spyGate = new object();  // 串行化 PID 跟踪与 reader 构建
     private bool _connected;
     private int _lastHsPid;
     private BattlegroundSpyReader _spy;
@@ -32,92 +33,134 @@ public class HearthMirrorService : IDisposable
             TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5));
     }
 
-    /// <summary>检查连续 null 次数，超过阈值则销毁缓存的 _spy</summary>
-    private void InvalidateSpyIfNeeded()
+    /// <summary>记录一次读取结果；连续失败超过阈值则销毁缓存的 _spy（可能已因过早 attach 而损坏）</summary>
+    private void NoteReadResult(bool success)
     {
-        _consecutiveNullCount++;
-        if (_consecutiveNullCount > 100)  // 连续 100 次返回 null，认为 _spy 已损坏
+        lock (_spyGate)
         {
-            Console.WriteLine($"[HM] BGSpy 连续返回 null {_consecutiveNullCount} 次，销毁并重建");
+            if (success)
+            {
+                _consecutiveNullCount = 0;
+                return;
+            }
+
+            _consecutiveNullCount++;
+            if (_consecutiveNullCount > 100)  // 连续 100 次返回 null，认为 _spy 已损坏
+            {
+                Console.WriteLine($"[HM] BGSpy 连续返回 null {_consecutiveNullCount} 次，销毁并重建");
+                _spy?.Dispose();
+                _spy = null;
+                _connected = false;
+                _consecutiveNullCount = 0;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 在持锁状态下同步炉石 PID 变化（触发 reader 重置与断开通知）。
+    /// 无炉石进程时抛异常。
+    /// </summary>
+    private int TrackPid()
+    {
+        var hsProcesses = Process.GetProcessesByName("Hearthstone");
+        if (hsProcesses.Length == 0)
+            throw new InvalidOperationException("Hearthstone not running");
+
+        var currentPid = hsProcesses[0].Id;
+        if (currentPid != _lastHsPid)
+        {
+            _lastHsPid = currentPid;
             _spy?.Dispose();
             _spy = null;
-            _connected = false;
-            _consecutiveNullCount = 0;
+            _lastPidChangeTime = DateTime.UtcNow;
+            if (_connected)
+            {
+                _connected = false;
+                OnDisconnected?.Invoke();
+            }
+            Console.WriteLine($"[HM] Detected Hearthstone PID={currentPid}");
         }
+        return currentPid;
     }
 
     private BattlegroundSpyReader GetSpy()
     {
-        if (_spy == null)
+        lock (_spyGate)
         {
-            var hsProcesses = Process.GetProcessesByName("Hearthstone");
-            if (hsProcesses.Length == 0)
-                throw new InvalidOperationException("Hearthstone not running");
-            try
+            TrackPid();
+
+            // 预热窗口：PID 出现/变化后至少等待 5 秒再构建 reader，
+            // 避免 Mono 未就绪时挂死或缓存半初始化的 reader。
+            // 此前只有 CheckConnection 有此保护，SceneWatcher/轮询路径会绕过它提前 attach。
+            if ((DateTime.UtcNow - _lastPidChangeTime).TotalSeconds < 5)
+                throw new InvalidOperationException("BGSpy warming up after PID change");
+
+            if (_spy == null)
             {
-                _spy = new BattlegroundSpyReader(hsProcesses[0].Id);
+                try
+                {
+                    _spy = new BattlegroundSpyReader(_lastHsPid);
+                }
+                catch (Exception ex)
+                {
+                    // Mono 未就绪，抛出让调用方重试（保持 _spy=null，下次重新构建）
+                    throw new InvalidOperationException($"BGSpy init failed (Mono not ready?): {ex.Message}", ex);
+                }
             }
-            catch (Exception ex)
-            {
-                // Mono 未就绪，抛出让调用方重试（不修改 _connected 状态）
-                throw new InvalidOperationException($"BGSpy init failed (Mono not ready?): {ex.Message}", ex);
-            }
+            return _spy;
         }
-        return _spy;
     }
 
     private void CheckConnection(object? state)
     {
         try
         {
-            var hsProcesses = Process.GetProcessesByName("Hearthstone");
-            if (hsProcesses.Length == 0)
+            // 炉石未运行：断开并重置跟踪状态
+            if (Process.GetProcessesByName("Hearthstone").Length == 0)
             {
-                if (_connected)
+                lock (_spyGate)
                 {
-                    _connected = false;
-                    _spy?.Dispose();
-                    _spy = null;
-                    OnDisconnected?.Invoke();
-                    Console.WriteLine("[HM] Hearthstone not running, disconnected");
+                    if (_connected)
+                    {
+                        _connected = false;
+                        _spy?.Dispose();
+                        _spy = null;
+                        _lastHsPid = 0;  // 重置以覆盖 PID 复用的边界情况
+                        _lastPidChangeTime = DateTime.MinValue;
+                        OnDisconnected?.Invoke();
+                        Console.WriteLine("[HM] Hearthstone not running, disconnected");
+                    }
                 }
                 return;
             }
 
-            var currentPid = hsProcesses[0].Id;
-            if (currentPid != _lastHsPid)
+            bool justConnected = false;
+            lock (_spyGate)
             {
-                _lastHsPid = currentPid;
-                _spy?.Dispose();
-                _spy = null;
-                _lastPidChangeTime = DateTime.UtcNow;
-                if (_connected)
+                TrackPid();  // 同步 PID 变化（含断开通知）
+
+                // PID 变化后延迟 5 秒再尝试初始化，给 Mono 启动时间
+                if (!_connected && (DateTime.UtcNow - _lastPidChangeTime).TotalSeconds >= 5)
                 {
-                    _connected = false;
-                    OnDisconnected?.Invoke();
+                    try
+                    {
+                        if (_spy == null)
+                            _spy = new BattlegroundSpyReader(_lastHsPid);
+                        _connected = true;
+                        justConnected = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        // Mono 未就绪，等下次重试
+                        Console.WriteLine($"[HM] BGSpy init failed, retrying: {ex.Message}");
+                    }
                 }
-                Console.WriteLine($"[HM] Detected Hearthstone PID={currentPid}");
             }
 
-            // PID 变化后延迟 5 秒再尝试初始化，给 Mono 启动时间
-            if (!_connected && (DateTime.UtcNow - _lastPidChangeTime).TotalSeconds < 5)
-                return;
-
-            // 主动尝试初始化 BGSpy，只有成功才标记为已连接
-            if (!_connected)
+            if (justConnected)
             {
-                try
-                {
-                    GetSpy();
-                    _connected = true;
-                    OnConnected?.Invoke();
-                    Console.WriteLine("[HM] Connected (BGSpy initialized)");
-                }
-                catch (Exception ex)
-                {
-                    // Mono 未就绪，等下次重试
-                    Console.WriteLine($"[HM] BGSpy init failed, retrying: {ex.Message}");
-                }
+                OnConnected?.Invoke();
+                Console.WriteLine("[HM] Connected (BGSpy initialized)");
             }
         }
         catch (Exception ex)
@@ -129,18 +172,20 @@ public class HearthMirrorService : IDisposable
     /// <summary>Get player BattleTag</summary>
     public BattleTag GetBattleTag()
     {
+        BattleTag result = null;
         try
         {
-            var result = GetSpy().GetBattleTag();
-            if (result == null) InvalidateSpyIfNeeded();
-            else _consecutiveNullCount = 0;  // 成功读取，重置计数
+            result = GetSpy().GetBattleTag();
             return result;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[HM] GetBattleTag failed: {ex.Message}");
-            InvalidateSpyIfNeeded();
             return null;
+        }
+        finally
+        {
+            NoteReadResult(result != null);
         }
     }
 
