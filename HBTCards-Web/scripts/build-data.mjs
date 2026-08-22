@@ -4,10 +4,14 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const raw = JSON.parse(readFileSync(new URL('../raw_bg_cards.json', import.meta.url), 'utf8'));
 
+// dbfId → cardId 全量表，用于解析金色版本 cardId
+const byDbfId = new Map(raw.cards.map(c => [c.id, c]));
+
 const cards = raw.cards
   .filter(c => c.cardType === 'minion' && !c.isToken && !c.isDuosOnly)
   .map(c => ({
     cardId: c.cardId,
+    goldenCardId: c.dbfIdGold ? byDbfId.get(c.dbfIdGold)?.cardId ?? `${c.cardId}_G` : `${c.cardId}_G`,
     name: (c.name || '').trim(),
     nameZh: (c.nameZh || '').trim(),
     textZh: c.textZh || '',

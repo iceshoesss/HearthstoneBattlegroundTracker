@@ -2,6 +2,7 @@
 
 export interface CardData {
   cardId: string;
+  goldenCardId: string;
   name: string;
   nameZh: string;
   textZh: string;

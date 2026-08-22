@@ -5,6 +5,9 @@ import { applyFilters, KEYWORD_FILTERS, RACE_CN, RACE_ORDER } from './core/cards
 // 与桌面版 BoardRenderer 相同的 256x 整卡渲染源（tiles 是特写裁切，会过度放大）
 const TILE_URL = (cardId: string) =>
   `https://art.hearthstonejson.com/v1/256x/${encodeURIComponent(cardId)}.jpg`;
+// 大图预览：bgs 全卡渲染（与桌面版查询器同源）
+const RENDER_URL = (id: string) =>
+  `https://art.hearthstonejson.com/v1/bgs/latest/zhCN/512x/${encodeURIComponent(id)}.png`;
 const OVERLAY = (name: string) => `/img/minions/${name}.png`;
 
 // 种族 → 图标（与桌面版一致：Beast 用 pet.jpg，中立用 other.jpg）
@@ -168,7 +171,7 @@ function SectionHeader({ title, count }: { title: string; count: number }) {
 }
 
 /* ═══════════ 随从卡（256 画布等比缩放，坐标与桌面版完全一致） ═══════════ */
-function MinionCard({ c }: { c: CardData }) {
+function MinionCard({ c, onSelect }: { c: CardData; onSelect: () => void }) {
   const has = (k: string) => c.keywords.includes(k);
   const overlay = (name: string) => (
     <img src={OVERLAY(name)} alt="" className="overlay-img" style={{ left: -24, top: -36, width: 300, height: 350 }} />
@@ -176,9 +179,9 @@ function MinionCard({ c }: { c: CardData }) {
 
   return (
     <div
-      className="minion-card relative mx-[5px] my-[5px]"
+      className="minion-card relative mx-[5px] my-[5px] cursor-pointer"
       style={{ width: 168, height: 200 }}
-      title={`${c.nameZh || c.name} · ${c.tier}★${c.minionType ? ' · ' + (RACE_CN[c.minionType] ?? '') : ''}`}
+      onClick={onSelect}
     >
       {/* 星级盾徽（约 1/3 压在头像上） */}
       <img
@@ -256,6 +259,9 @@ export default function App() {
   const sections: Section[] = useMemo(() => (db ? applyFilters(db, filters) : []), [db, filters]);
   const total = sections.reduce((n, s) => n + s.cards.length, 0);
 
+  // ── 点击卡片 → 详情弹窗（普通 + 金色 + 文本） ──
+  const [previewCard, setPreviewCard] = useState<CardData | null>(null);
+
   if (error)
     return (
       <div className="flex h-screen items-center justify-center text-red-400">
@@ -305,10 +311,13 @@ export default function App() {
 
             {/* ───── 中：随从列表 ───── */}
             <main className="felt-bg relative mx-0 flex min-h-0 flex-col overflow-hidden rounded-[14px] border-2 border-[#20142e] lg:mx-0">
-              <div className="flex shrink-0 justify-center pt-[14px]">
+              <div className="flex shrink-0 flex-col items-center pt-[10px]">
                 <div className="parchment flex h-[34px] w-[430px] max-w-[92%] items-center justify-center rounded-md border border-[#8a7345] shadow-lg">
                   <span className="text-base font-bold tracking-widest text-[#3a2c18]">随 从</span>
                 </div>
+                <span className="mt-1 text-[11px] tracking-wide text-[#d9c184]/55">
+                  BattlegroundDB v{db?.version ?? '…'} · 共 {db?.count ?? 0} 名随从 · 点击卡片查看详情
+                </span>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1">
                 {!db ? (
@@ -321,7 +330,7 @@ export default function App() {
                       <SectionHeader title={s.title} count={s.cards.length} />
                       <div className="flex flex-wrap justify-center pb-2">
                         {s.cards.map(c => (
-                          <MinionCard key={c.cardId} c={c} />
+                          <MinionCard key={c.cardId} c={c} onSelect={() => setPreviewCard(c)} />
                         ))}
                       </div>
                     </section>
@@ -379,6 +388,70 @@ export default function App() {
               </div>
             </Panel>
           </div>
+        </div>
+      </div>
+
+      {/* ═══════════ 详情弹窗（普通 + 金色 + 文本） ═══════════ */}
+      {previewCard && (
+        <CardModal card={previewCard} onClose={() => setPreviewCard(null)} />
+      )}
+    </div>
+  );
+}
+
+/* ═══════════ 详情弹窗：普通 + 金色整卡渲染 + 卡牌文本 ═══════════ */
+function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex flex-col gap-3 rounded-xl border border-[#b08d4f]/70 bg-[#141008f2] p-4 shadow-[0_16px_60px_rgba(0,0,0,0.8)]"
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          title="关闭 (Esc)"
+          className="absolute -right-3 -top-3 h-8 w-8 cursor-pointer rounded-full border border-[#77572e] bg-[#261207] text-sm text-[#d9c184] transition-colors hover:border-[#ffd75e] hover:text-[#ffd75e]"
+        >
+          ✕
+        </button>
+
+        <div className="flex gap-3">
+          <img
+            src={RENDER_URL(card.cardId)}
+            alt={card.nameZh}
+            className="w-[280px] rounded-md bg-zinc-900/80"
+          />
+          <img
+            key={card.goldenCardId}
+            src={RENDER_URL(card.goldenCardId + '_triple')}
+            alt=""
+            className="w-[280px] rounded-md ring-1 ring-amber-400/50 bg-zinc-900/80"
+            onError={e => ((e.target as HTMLImageElement).style.display = 'none')}
+          />
+        </div>
+
+        <div className="min-w-[568px] border-t border-[#77572e]/50 pt-2.5">
+          <div className="text-base font-bold text-amber-200">
+            {card.nameZh || card.name}
+            <span className="ml-2 text-xs font-normal text-zinc-400">
+              {card.tier}★{card.minionType ? ' · ' + (RACE_CN[card.minionType] ?? '') : ''}
+            </span>
+          </div>
+          {card.textZh && (
+            <div
+              className="mt-1.5 text-sm leading-relaxed text-zinc-300 [&_b]:text-amber-200"
+              dangerouslySetInnerHTML={{ __html: card.textZh }}
+            />
+          )}
         </div>
       </div>
     </div>
