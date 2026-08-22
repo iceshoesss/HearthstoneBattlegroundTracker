@@ -1,0 +1,46 @@
+@import 'tailwindcss';
+
+/* 深色主题基底 */
+html {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-[#0f1115] text-zinc-200 antialiased;
+  font-family:
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    'Microsoft YaHei',
+    sans-serif;
+}
+
+/* 纤细滚动条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(185, 154, 94, 0.4) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: rgba(185, 154, 94, 0.4);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 215, 94, 0.7);
+}
+
+/* 卡牌悬停浮起 */
+.card-tile {
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.card-tile:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.55),
+    0 0 14px rgba(255, 215, 94, 0.25);
+}
