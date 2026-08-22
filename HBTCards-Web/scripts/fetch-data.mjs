@@ -14,8 +14,9 @@ try {
   });
   if (!rel.ok) throw new Error(`GitHub API ${rel.status}`);
   const data = await rel.json();
-  const asset = (data.assets || []).find(a => a.name === 'cards.json');
-  if (!asset) throw new Error('Release 中无 cards.json 资产');
+  // CI 生成的文件名为 web-cards.json（gh release 上传时 #标签 不改变资产名）
+  const asset = (data.assets || []).find(a => a.name === 'web-cards.json');
+  if (!asset) throw new Error('Release 中无 web-cards.json 资产');
 
   // 2. 下载
   const res = await fetch(asset.browser_download_url, { headers: { 'User-Agent': 'hbt-cards' } });
