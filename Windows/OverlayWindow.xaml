@@ -1,9 +1,0 @@
-<Window x:Class="HBT.Windows.OverlayWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="HBT Overlay" Height="100" Width="300"
-        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize"
-        Left="0" Top="0">
-    <Grid x:Name="OverlayGrid" Background="Transparent"/>
-</Window>
