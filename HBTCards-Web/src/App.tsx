@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import type { CardData, CardsDb, Filters, Section } from './core/cards';
 import { applyFilters, KEYWORD_FILTERS, RACE_CN, RACE_ORDER } from './core/cards';
 
@@ -269,9 +269,11 @@ export default function App() {
       </div>
     );
 
-  /* ── 类型/特殊选择 ── */
-  const selectType = (race: string | null, special: Filters['special']) =>
-    setFilters(f => ({ ...f, race, special }));
+  /* ── 类型/特殊独立筛选（可叠加） ── */
+  const selectRace = (race: string | null) =>
+    setFilters(f => ({ ...f, race: f.race === race ? null : race }));
+  const selectSpecial = (special: Filters['special']) =>
+    setFilters(f => ({ ...f, special: f.special === special ? null : special }));
 
   return (
     <div className="flex min-h-screen items-start justify-center p-[14px]">
@@ -345,8 +347,8 @@ export default function App() {
               <div className="grid grid-cols-2 px-[14px] pt-2">
                 <CircleButton
                   caption="全部种族"
-                  active={!filters.race && !filters.special}
-                  onClick={() => selectType(null, null)}
+                  active={!filters.race}
+                  onClick={() => selectRace(null)}
                 >
                   <CrownCircle />
                 </CircleButton>
@@ -355,7 +357,7 @@ export default function App() {
                     key={r}
                     caption={RACE_CN[r]}
                     active={filters.race === r}
-                    onClick={() => selectType(r, null)}
+                    onClick={() => selectRace(r)}
                   >
                     <TribeCircle file={RACE_ICON[r]} />
                   </CircleButton>
@@ -363,7 +365,7 @@ export default function App() {
                 <CircleButton
                   caption="中立"
                   active={filters.race === 'NEUTRAL'}
-                  onClick={() => selectType('NEUTRAL', null)}
+                  onClick={() => selectRace('NEUTRAL')}
                 >
                   <TribeCircle file="other.jpg" />
                 </CircleButton>
@@ -374,14 +376,14 @@ export default function App() {
                 <CircleButton
                   caption="伙伴"
                   active={filters.special === 'BUDDY'}
-                  onClick={() => selectType(null, 'BUDDY')}
+                  onClick={() => selectSpecial('BUDDY')}
                 >
                   <TribeCircle file="buddy.jpg" />
                 </CircleButton>
                 <CircleButton
                   caption="时空扭曲"
                   active={filters.special === 'TIMEWARPED'}
-                  onClick={() => selectType(null, 'TIMEWARPED')}
+                  onClick={() => selectSpecial('TIMEWARPED')}
                 >
                   <VoidCircle />
                 </CircleButton>
@@ -457,3 +459,4 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
     </div>
   );
 }
+

@@ -95,9 +95,15 @@ export function applyFilters(db: CardsDb, f: Filters): Section[] {
   else {
     // 常规浏览排除特殊类别
     list = list.filter(c => !c.isBuddy && !c.isTimewarped);
-    if (f.race === 'NEUTRAL') list = list.filter(c => !c.minionType || c.minionType === '');
-    else if (f.race) list = list.filter(c => c.minionType === f.race);
   }
+
+  // 种族筛选对所有模式生效（含伙伴/时空扭曲）
+  if (f.race === 'NEUTRAL') list = list.filter(c => !c.minionType);
+  else if (f.race) list = list.filter(c => c.minionType === f.race);
+
+  // 种族筛选对所有模式生效（含伙伴/时空扭曲）
+  if (f.race === 'NEUTRAL') list = list.filter(c => !c.minionType);
+  else if (f.race) list = list.filter(c => c.minionType === f.race);
 
   if (f.tier != null) list = list.filter(c => c.tier === f.tier);
 
