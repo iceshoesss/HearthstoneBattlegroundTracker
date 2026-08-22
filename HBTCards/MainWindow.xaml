@@ -8,9 +8,9 @@
 
     <Window.Resources>
 
-        <!-- ═══════════ 阴影效果 ═══════════ -->
+        <!-- ═══════════ 阴影 ═══════════ -->
         <DropShadowEffect x:Key="CardShadow" Color="#000" BlurRadius="6" ShadowDepth="2" Opacity="0.55"/>
-        <DropShadowEffect x:Key="TextShadow" Color="#000" BlurRadius="3" ShadowDepth="1" Opacity="0.9"/>
+        <DropShadowEffect x:Key="StatOutline" Color="#000" BlurRadius="2" ShadowDepth="1.5" Opacity="1"/>
 
         <!-- ═══════════ 颜色 ═══════════ -->
         <LinearGradientBrush x:Key="WoodFrame" StartPoint="0,0" EndPoint="0,1">
@@ -31,53 +31,28 @@
             <GradientStop Color="#39456f" Offset="0"/>
             <GradientStop Color="#232c4d" Offset="1"/>
         </LinearGradientBrush>
-        <LinearGradientBrush x:Key="ShieldFill" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#b13fae" Offset="0"/>
-            <GradientStop Color="#7c2287" Offset="0.55"/>
-            <GradientStop Color="#57155f" Offset="1"/>
-        </LinearGradientBrush>
-        <LinearGradientBrush x:Key="MetalRing" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#e8ecef" Offset="0"/>
-            <GradientStop Color="#8b9099" Offset="0.5"/>
-            <GradientStop Color="#5c6068" Offset="1"/>
-        </LinearGradientBrush>
         <LinearGradientBrush x:Key="Parchment" StartPoint="0,0" EndPoint="0,1">
             <GradientStop Color="#efe5c4" Offset="0"/>
             <GradientStop Color="#d6c69a" Offset="1"/>
         </LinearGradientBrush>
 
-        <!-- ═══════════ 盾形等级按钮 ═══════════ -->
-        <Style x:Key="ShieldBtn" TargetType="ToggleButton">
+        <!-- ═══════════ 等级按钮（HDT tier 图标 + 选中光晕） ═══════════ -->
+        <Style x:Key="TierBtn" TargetType="ToggleButton">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Grid Width="78" Height="92" Background="Transparent">
-                            <Path x:Name="glow" Fill="#33ffd75e" Data="M2,2 H76 V52 C76,70 39,88 39,88 C39,88 2,70 2,52 Z"
-                                  Visibility="Collapsed"/>
-                            <Path x:Name="shield" Data="M6,6 H72 V52 C72,68 39,82 39,82 C39,82 6,68 6,52 Z"
-                                  Fill="{StaticResource ShieldFill}" Stroke="#9aa0ab" StrokeThickness="3.5"/>
-                            <Path Data="M12,11 H66 V26 H12 Z" Fill="#26ffffff"/>
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              Margin="0,2,0,14" TextBlock.Foreground="#ffd75e"
-                                              TextBlock.FontSize="15" TextBlock.FontWeight="Bold"
-                                              TextBlock.TextAlignment="Center"/>
+                        <Grid Width="84" Height="98" Background="Transparent">
+                            <Image x:Name="glow" Source="pack://application:,,,/Resources/Tiers/tier-glow.png"
+                                   Visibility="Collapsed"/>
+                            <ContentPresenter/>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="shield" Property="Stroke" Value="#ffe9a8"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="shield" Property="Fill" Value="#5c1064"/>
+                                <Setter Property="Opacity" Value="0.85"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="glow" Property="Visibility" Value="Visible"/>
-                                <Setter TargetName="shield" Property="Stroke" Value="#ffd75e"/>
-                                <Setter TargetName="shield" Property="Effect">
-                                    <Setter.Value>
-                                        <DropShadowEffect Color="#ffce54" BlurRadius="18" ShadowDepth="0" Opacity="0.9"/>
-                                    </Setter.Value>
-                                </Setter>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -120,83 +95,70 @@
             </Setter>
         </Style>
 
-        <!-- ═══════════ 关键词角标 ═══════════ -->
-        <DataTemplate x:Key="ChipTpl">
-            <Border Background="#cc100a18" CornerRadius="4" Padding="3" Margin="1.5" Height="22" MinWidth="22">
-                <Grid>
-                    <Image Source="{Binding Icon}" Visibility="{Binding IconVis}" Stretch="Uniform"/>
-                    <TextBlock Text="{Binding Text}" Visibility="{Binding TextVis}" FontSize="10"
-                               Foreground="#ffd75e" FontWeight="Bold"
-                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Grid>
-            </Border>
-        </DataTemplate>
-
-        <!-- ═══════════ 随从卡 ═══════════ -->
+        <!-- ═══════════ 随从卡（BoardRenderer 同款 256 画布，Viewbox 缩放） ═══════════ -->
         <DataTemplate x:Key="MinionTpl">
-            <Border x:Name="cardRoot" Width="164" Margin="5,4" CornerRadius="10" Background="#22000000"
-                    RenderTransformOrigin="0.5,0.5">
-                <Border.RenderTransform>
-                    <ScaleTransform ScaleX="1" ScaleY="1"/>
-                </Border.RenderTransform>
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="RenderTransform">
-                                    <Setter.Value>
-                                        <ScaleTransform ScaleX="1.05" ScaleY="1.05"/>
-                                    </Setter.Value>
-                                </Setter>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-                <Grid Height="238">
-                    <!-- 星级盾徽 -->
-                    <Path Panel.ZIndex="2" Data="M4,4 H46 V30 C46,41 25,49 25,49 C25,49 4,41 4,30 Z"
-                          Fill="{StaticResource ShieldFill}" Stroke="#9aa0ab" StrokeThickness="2.5"
-                          HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,6,0,0"
-                          Effect="{StaticResource CardShadow}"/>
-                    <TextBlock Panel.ZIndex="3" Text="{Binding StarsText}" FontSize="9" FontWeight="Bold"
-                               Foreground="#ffd75e" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="36"
-                               HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,12,0,0"/>
-                    <!-- 椭圆头像 -->
-                    <Ellipse Width="134" Height="152" VerticalAlignment="Top" Margin="0,34,0,0"
-                             Stroke="{StaticResource MetalRing}" StrokeThickness="4" Fill="#241833"/>
-                    <Image Width="126" Height="144" VerticalAlignment="Top" Margin="0,38,0,0"
-                           Stretch="UniformToFill" Source="{Binding Image}">
-                        <Image.Clip>
-                            <EllipseGeometry Center="63,72" RadiusX="63" RadiusY="72"/>
-                        </Image.Clip>
-                    </Image>
-                    <!-- 攻击水滴 -->
-                    <Path Data="M16,0 C22,9 32,17 32,26 A16,16 0 1,1 0,26 C0,17 10,9 16,0 Z"
-                          Fill="#f0b429" Stroke="#7a5210" StrokeThickness="2"
-                          HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10,0,0,26"
-                          Effect="{StaticResource CardShadow}"/>
-                    <TextBlock Text="{Binding Attack}" FontSize="15" FontWeight="ExtraBold" Foreground="#fff"
-                               HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="19,0,0,37"
-                               Effect="{StaticResource TextShadow}"/>
-                    <!-- 血量水滴 -->
-                    <Path Data="M16,0 C22,9 32,17 32,26 A16,16 0 1,1 0,26 C0,17 10,9 16,0 Z"
-                          Fill="#e04338" Stroke="#701209" StrokeThickness="2"
-                          HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,10,26"
-                          Effect="{StaticResource CardShadow}"/>
-                    <TextBlock Text="{Binding Health}" FontSize="15" FontWeight="ExtraBold" Foreground="#fff"
-                               HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,19,37"
-                               Effect="{StaticResource TextShadow}"/>
-                    <!-- 关键词角标行 -->
-                    <ItemsControl ItemsSource="{Binding Chips}" ItemTemplate="{StaticResource ChipTpl}"
-                                  HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,0">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                    </ItemsControl>
-                </Grid>
-            </Border>
+            <Grid Width="168" Height="200" Margin="5,7" Background="Transparent" ToolTip="{Binding Name}">
+                <!-- 星级盾徽（游戏内样式，约 1/3 压在头像上） -->
+                <Image Source="{Binding TierIcon}" Width="52" VerticalAlignment="Top"
+                       HorizontalAlignment="Center" Panel.ZIndex="3" Margin="0,4,0,0"
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       Effect="{StaticResource CardShadow}"/>
+                <!-- 256 画布等比缩放 -->
+                <Viewbox Width="164" Height="164" VerticalAlignment="Bottom">
+                    <Canvas Width="256" Height="256">
+                        <!-- 嘲讽 -->
+                        <Image Source="pack://application:,,,/Resources/Minion/taunt.png"
+                               Width="300" Height="350" Canvas.Left="-24" Canvas.Top="-36"
+                               Visibility="{Binding TauntVis}"/>
+                        <!-- 肖像（椭圆裁剪） -->
+                        <Rectangle Width="256" Height="256" RenderOptions.BitmapScalingMode="HighQuality">
+                            <Rectangle.Fill>
+                                <ImageBrush ImageSource="{Binding Image}" Stretch="UniformToFill"/>
+                            </Rectangle.Fill>
+                            <Rectangle.Clip>
+                                <EllipseGeometry Center="128,128" RadiusX="87" RadiusY="120"/>
+                            </Rectangle.Clip>
+                        </Rectangle>
+                        <!-- 边框 -->
+                        <Image Source="pack://application:,,,/Resources/Minion/border.png"
+                               Width="300" Height="350" Canvas.Left="-24" Canvas.Top="-36"/>
+                        <!-- 复生 / 亡语 / 剧�?/ 烈毒 -->
+                        <Image Source="pack://application:,,,/Resources/Minion/reborn.png"
+                               Width="300" Height="350" Canvas.Left="-24" Canvas.Top="-36"
+                               Visibility="{Binding RebornVis}"/>
+                        <Image Source="pack://application:,,,/Resources/Minion/deathrattle.png"
+                               Width="300" Height="350" Canvas.Left="-24" Canvas.Top="-36"
+                               Visibility="{Binding DeathrattleVis}"/>
+                        <Image Source="pack://application:,,,/Resources/Minion/poisonous.png"
+                               Width="300" Height="350" Canvas.Left="-24" Canvas.Top="-36"
+                               Visibility="{Binding PoisonousVis}"/>
+                        <Image Source="pack://application:,,,/Resources/Minion/venomous.png"
+                               Width="300" Height="350" Canvas.Left="-24" Canvas.Top="-36"
+                               Visibility="{Binding VenomousVis}"/>
+                        <!-- 属性面板 -->
+                        <Image Source="pack://application:,,,/Resources/Minion/stats.png"
+                               Width="300" Height="350" Canvas.Left="-24" Canvas.Top="-36"/>
+                        <!-- 圣盾 -->
+                        <Image Source="pack://application:,,,/Resources/Minion/divine-shield.png"
+                               Width="325" Height="311" Canvas.Left="-36" Canvas.Top="-24"
+                               Visibility="{Binding DivineShieldVis}"/>
+                        <!-- 攻击力 -->
+                        <TextBlock Text="{Binding AtkText}" FontSize="45" FontWeight="Bold"
+                                   FontFamily="pack://application:,,,/Resources/#Chunkfive"
+                                   Foreground="{Binding AtkBrush}"
+                                   Width="75" Height="75" TextAlignment="Center"
+                                   Canvas.Left="29" Canvas.Top="185"
+                                   Effect="{StaticResource StatOutline}"/>
+                        <!-- 生命值 -->
+                        <TextBlock Text="{Binding HpText}" FontSize="45" FontWeight="Bold"
+                                   FontFamily="pack://application:,,,/Resources/#Chunkfive"
+                                   Foreground="{Binding HpBrush}"
+                                   Width="75" Height="75" TextAlignment="Center"
+                                   Canvas.Left="151" Canvas.Top="185"
+                                   Effect="{StaticResource StatOutline}"/>
+                    </Canvas>
+                </Viewbox>
+            </Grid>
         </DataTemplate>
 
         <!-- ═══════════ 分组区头 ═══════════ -->
@@ -223,7 +185,6 @@
             </Grid>
         </DataTemplate>
 
-
     </Window.Resources>
 
     <!-- ═══════════════ 木纹外框 ═══════════════ -->
@@ -248,7 +209,7 @@
                             <TextBlock Text="等  级" FontSize="15" FontWeight="Bold" Foreground="#e8d5a2"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
-                        <UniformGrid x:Name="TierRow" Columns="2" Margin="10,8,10,0"/>
+                        <UniformGrid x:Name="TierRow" Columns="2" Margin="14,8,14,0"/>
                     </StackPanel>
                 </Border>
 
@@ -270,15 +231,14 @@
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
 
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
-                                      Padding="6,4,14,4">
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="6,4,14,4">
                             <ItemsControl x:Name="SectionsView">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel>
                                             <ContentPresenter Content="{Binding Title}"
                                                               ContentTemplate="{StaticResource SectionHdrTpl}"/>
-                                            <ItemsControl ItemsSource="{Binding Items}"
+                                            <ItemsControl ItemsSource="{Binding Cards}"
                                                           ItemTemplate="{StaticResource MinionTpl}">
                                                 <ItemsControl.ItemsPanel>
                                                     <ItemsPanelTemplate>
@@ -304,7 +264,7 @@
                             <TextBlock Text="类  型" FontSize="15" FontWeight="Bold" Foreground="#e8d5a2"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
-                        <UniformGrid x:Name="RaceRow" Columns="2" Margin="10,8,10,0"/>
+                        <UniformGrid x:Name="RaceRow" Columns="2" Margin="14,8,14,0"/>
                     </StackPanel>
                 </Border>
             </Grid>

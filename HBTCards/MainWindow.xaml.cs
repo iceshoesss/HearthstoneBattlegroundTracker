@@ -18,7 +18,7 @@ public partial class MainWindow : Window
     private static readonly string[] RaceOrder =
         { "Beast", "Demon", "Dragon", "Elemental", "Mech", "Murloc", "Naga", "Pirate", "Quilboar", "Undead" };
 
-    /// <summary>种族 → 图标文件名（Beast 暂用 pet.jpg）</summary>
+    /// <summary>种族 → 图标文件名（HDT 同款，Beast 即 pet.jpg）</summary>
     private static readonly Dictionary<string, string> TribeIcons = new()
     {
         ["Beast"] = "pet.jpg",
@@ -33,20 +33,10 @@ public partial class MainWindow : Window
         ["Undead"] = "undead.jpg",
     };
 
-    /// <summary>关键词 → 角标图标（无图标的显示文字）</summary>
-    private static readonly Dictionary<string, string> KeywordIcons = new()
-    {
-        ["圣盾"] = "divine-shield.png",
-        ["剧毒"] = "poisonous.png",
-        ["烈毒"] = "venomous.png",
-        ["复生"] = "reborn.png",
-        ["嘲讽"] = "taunt.png",
-        ["亡语"] = "deathrattle.png",
-    };
-
     private readonly CardDatabaseService _db = new();
-    private readonly ImageCacheService _imgCache = new(
-        "https://art.hearthstonejson.com/v1/tiles", "hbtcards_tiles", "png");
+
+    // 与主工程 OverlayWindow 相同的 256x 图源；原图解码 + 跳过 ETag 校验（批量浏览提速）
+    private readonly ImageCacheService _imgCache256 = new("256x", decodePixelWidth: 0, verifyEtags: false);
 
     private int? _activeTier;
     private string _activeRace;   // null=全部, Title Case 种族, "NEUTRAL"
@@ -54,7 +44,14 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        Loaded += (_, _) => { BuildTierFilters(); BuildRaceFilters(); ApplyFilters(); };
+        Loaded += async (_, _) =>
+        {
+            // 数据库加载较重，移出 UI 线程避免窗口假死
+            await Task.Run(() => _db.EnsureLoaded());
+            BuildTierFilters();
+            BuildRaceFilters();
+            ApplyFilters();
+        };
     }
 
     // ═══════════════════════════════════════════════
@@ -63,15 +60,15 @@ public partial class MainWindow : Window
 
     private void BuildTierFilters()
     {
-        for (int tier = 1; tier <= 6; tier++)
+        for (int tier = 1; tier <= 7; tier++)
         {
-            var stars = new TextBlock
+            var icon = new Image
             {
-                Text = new string('★', tier),
-                TextWrapping = TextWrapping.Wrap,
-                MaxWidth = 52,
+                Source = new ImageSourceConverter().ConvertFromString(
+                    $"pack://application:,,,/Resources/Tiers/tier-{tier}.png") as ImageSource,
+                Width = 76,
             };
-            var btn = new ToggleButton { Style = (Style)FindResource("ShieldBtn"), Content = stars, Tag = tier };
+            var btn = new ToggleButton { Style = (Style)FindResource("TierBtn"), Content = icon, Tag = tier };
             btn.Click += TierFilter_Click;
             TierRow.Children.Add(btn);
         }
@@ -96,7 +93,6 @@ public partial class MainWindow : Window
         {
             if (btn.IsChecked == true)
             {
-                // 组内互斥：取消其他选中项
                 foreach (var c in RaceRow.Children.OfType<ToggleButton>())
                     if (c != btn) c.IsChecked = false;
                 _activeRace = raceCode;
@@ -149,7 +145,6 @@ public partial class MainWindow : Window
                 $"pack://application:,,,/Resources/TribeIcons/{fileName}") as ImageSource,
             Stretch = Stretch.UniformToFill,
         };
-        // 圆形裁剪
         image.Loaded += (_, _) =>
         {
             image.Clip = new EllipseGeometry(
@@ -216,7 +211,7 @@ public partial class MainWindow : Window
         else if (!string.IsNullOrEmpty(_activeRace))
             minions = minions.Where(m => m.MinionType == _activeRace).ToList();
 
-        // 分组顺序: 全部(All) → 中立 → 各种族
+        // 分组顺序: 全部(All) → 中立 → 各种族（与游戏内浏览器一致）
         int GroupOrder(string raw) => raw switch
         {
             "All" => 0,
@@ -235,80 +230,97 @@ public partial class MainWindow : Window
                     "" => "中立",
                     _ => CardDatabaseService.GetRaceChinese(g.Key),
                 },
-                Items = g.OrderBy(m => m.Tier ?? 0).ThenBy(m => m.NameZh ?? "").Select(ToDisplayItem).ToList(),
+                Cards = g.OrderBy(m => m.Tier ?? 0).ThenBy(m => m.NameZh ?? "").Select(CreateMinionVM).ToList(),
             })
-            .Where(s => s.Items.Count > 0)
+            .Where(s => s.Cards.Count > 0)
             .ToList();
 
         SectionsView.ItemsSource = sections;
-        _ = LoadImagesAsync(sections.SelectMany(s => s.Items).ToList());
+        _ = LoadImagesAsync(sections.SelectMany(s => s.Cards).ToList());
     }
 
-    private MinionDisplayItem ToDisplayItem(BgdbCard m)
+    private MinionVM CreateMinionVM(BgdbCard m)
     {
-        var keywords = CardDatabaseService.GetKeywords(m);
-        var chips = keywords.Take(3).Select(kw => new Chip
-        {
-            Icon = KeywordIcons.TryGetValue(kw, out var icon)
-                ? $"pack://application:,,,/Resources/Keywords/{icon}"
-                : "",
-            Text = KeywordIcons.ContainsKey(kw) ? "" : kw,
-        }).ToList();
+        var kws = m.Keywords ?? new List<string>();
+        bool Has(string k) => kws.Contains(k);
 
-        return new MinionDisplayItem
+        return new MinionVM
         {
             CardId = m.CardId ?? "",
-            Name = m.NameZh ?? m.Name ?? m.CardId ?? "",
-            Attack = m.Attack.ToString(),
-            Health = m.Health.ToString(),
-            StarsText = new string('★', Math.Max(1, m.Tier ?? 1)),
-            Chips = chips,
+            Name = $"{m.NameZh ?? m.Name} （{CardDatabaseService.GetRaceChinese(m.MinionType ?? "")}）",
+            TierIcon = $"pack://application:,,,/Resources/Tiers/tier-{Math.Max(1, m.Tier ?? 1)}.png",
+            TauntVis = Has("Taunt") ? Visibility.Visible : Visibility.Collapsed,
+            RebornVis = Has("Reborn") ? Visibility.Visible : Visibility.Collapsed,
+            DeathrattleVis = Has("Deathrattle") ? Visibility.Visible : Visibility.Collapsed,
+            PoisonousVis = Has("Poisonous") ? Visibility.Visible : Visibility.Collapsed,
+            VenomousVis = Has("Venomous") ? Visibility.Visible : Visibility.Collapsed,
+            DivineShieldVis = Has("Divine Shield") ? Visibility.Visible : Visibility.Collapsed,
+            AtkText = FormatStat(m.Attack),
+            HpText = FormatStat(m.Health),
+            AtkBrush = Brushes.White,
+            HpBrush = Brushes.White,
         };
     }
 
-    private async Task LoadImagesAsync(List<MinionDisplayItem> items)
+    /// <summary>大数值缩写（与 BoardRenderer.FormatStat 一致）</summary>
+    private static string FormatStat(int value)
     {
-        foreach (var item in items)
+        if (value < 100000) return value.ToString();
+        if (value < 10000000) return $"{value / 10000.0:0.#}万";
+        return $"{value / 100000000.0:0.##}亿";
+    }
+
+    private async Task LoadImagesAsync(List<MinionVM> items)
+    {
+        // 已缓存的同步上屏；未缓存的并发下载（限 8 路）
+        using var gate = new System.Threading.SemaphoreSlim(8);
+        var tasks = items.Select(async item =>
         {
-            var cached = _imgCache.GetTileOrPlaceholder(item.CardId);
-            if (cached != _imgCache.Placeholder)
+            var cached = _imgCache256.GetTileOrPlaceholder(item.CardId);
+            if (cached != _imgCache256.Placeholder)
             {
                 item.Image = cached;
-                continue;
+                return;
             }
-            try { item.Image = await _imgCache.GetTileAsync(item.CardId); }
+            try
+            {
+                await gate.WaitAsync();
+                try { item.Image = await _imgCache256.GetTileAsync(item.CardId); }
+                finally { gate.Release(); }
+            }
             catch { /* 网络失败保留占位符 */ }
-        }
+        });
+        await Task.WhenAll(tasks);
     }
 
     // ═══════════════════════════════════════════════
     //  视图模型
     // ═══════════════════════════════════════════════
 
-    public class Chip
-    {
-        public string Icon { get; set; } = "";
-        public string Text { get; set; } = "";
-        public Visibility IconVis => string.IsNullOrEmpty(Icon) ? Visibility.Collapsed : Visibility.Visible;
-        public Visibility TextVis => string.IsNullOrEmpty(Text) ? Visibility.Collapsed : Visibility.Visible;
-    }
-
     public class Section
     {
         public string Title { get; set; } = "";
-        public List<MinionDisplayItem> Items { get; set; } = new();
+        public List<MinionVM> Cards { get; set; } = new();
     }
 
-    public class MinionDisplayItem : INotifyPropertyChanged
+    public class MinionVM : INotifyPropertyChanged
     {
         private ImageSource _image;
 
         public string CardId { get; set; } = "";
         public string Name { get; set; } = "";
-        public string Attack { get; set; } = "";
-        public string Health { get; set; } = "";
-        public string StarsText { get; set; } = "";
-        public List<Chip> Chips { get; set; } = new();
+        public string TierIcon { get; set; } = "";
+        public string AtkText { get; set; } = "";
+        public string HpText { get; set; } = "";
+        public Brush AtkBrush { get; set; } = Brushes.White;
+        public Brush HpBrush { get; set; } = Brushes.White;
+
+        public Visibility TauntVis { get; set; }
+        public Visibility RebornVis { get; set; }
+        public Visibility DeathrattleVis { get; set; }
+        public Visibility PoisonousVis { get; set; }
+        public Visibility VenomousVis { get; set; }
+        public Visibility DivineShieldVis { get; set; }
 
         public ImageSource Image
         {
