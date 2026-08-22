@@ -24,6 +24,7 @@ public class ImageCacheService
     private static readonly HttpClient _http = new();
     private readonly string _baseUrl;
     private readonly string _extension;
+    private readonly int _decodePixelWidth;
     private readonly string _cacheDir;
     private readonly string _etagFile;
     private readonly ConcurrentDictionary<string, BitmapImage> _memCache = new();
@@ -31,15 +32,21 @@ public class ImageCacheService
     private readonly object _lruLock = new();
     private readonly ConcurrentDictionary<string, string> _etags = new();
 
+    private readonly bool _verifyEtags;
+
     public BitmapImage Placeholder { get; }
 
     /// <summary>创建缓存服务实例</summary>
     /// <param name="size">图片尺寸: "tiles" 或 "256x"</param>
-    public ImageCacheService(string size = "tiles")
+    /// <param name="decodePixelWidth">解码像素宽度（0=原图），大图场景调高避免模糊</param>
+    /// <param name="verifyEtags">本地命中时是否仍发 ETag 条件请求校验更新；批量浏览场景传 false 提速</param>
+    public ImageCacheService(string size = "tiles", int decodePixelWidth = 128, bool verifyEtags = true)
     {
         _baseUrl = $"https://art.hearthstonejson.com/v1/{size}";
         _extension = size == "tiles" ? "png" : "jpg";
-        
+        _decodePixelWidth = decodePixelWidth;
+        _verifyEtags = verifyEtags;
+
         _cacheDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "HearthstoneBattlegroundTracker", "Images", size);
@@ -52,11 +59,12 @@ public class ImageCacheService
     }
 
     /// <summary>创建缓存服务实例（自定义 URL 和缓存目录）</summary>
-    public ImageCacheService(string baseUrl, string cacheKey, string extension = "png")
+    public ImageCacheService(string baseUrl, string cacheKey, string extension = "png", int decodePixelWidth = 128)
     {
         _baseUrl = baseUrl;
         _extension = extension;
-        
+        _decodePixelWidth = decodePixelWidth;
+
         _cacheDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "HearthstoneBattlegroundTracker", "Images", cacheKey);
@@ -105,8 +113,17 @@ public class ImageCacheService
             return cached;
         }
 
-        // 本地文件 + ETag 验证
+        // 本地文件；verifyEtags=false 时直接使用缓存，不发条件请求
         var localPath = GetLocalPath(cardId);
+        if (File.Exists(localPath) && !_verifyEtags)
+        {
+            var img = LoadFromFile(localPath);
+            if (img != null)
+            {
+                AddToCache(cardId, img);
+                return img;
+            }
+        }
         if (File.Exists(localPath))
         {
             var needsRefresh = await CheckAndDownload(cardId, localPath);
@@ -245,7 +262,7 @@ public class ImageCacheService
         catch { }
     }
 
-    private static BitmapImage LoadFromFile(string path)
+    private BitmapImage LoadFromFile(string path)
     {
         try
         {
@@ -253,7 +270,7 @@ public class ImageCacheService
             img.BeginInit();
             img.UriSource = new Uri(path, UriKind.Absolute);
             img.CacheOption = BitmapCacheOption.OnLoad;
-            img.DecodePixelWidth = 128;
+            if (_decodePixelWidth > 0) img.DecodePixelWidth = _decodePixelWidth;
             img.EndInit();
             img.Freeze();
             return img;
