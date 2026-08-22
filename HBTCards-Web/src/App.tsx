@@ -2,9 +2,8 @@
 import type { CardData, CardsDb, Filters, Section } from './core/cards';
 import { applyFilters, KEYWORD_FILTERS, RACE_CN, RACE_ORDER } from './core/cards';
 
-// 与桌面版 BoardRenderer 相同的 256x 整卡渲染源（tiles 是特写裁切，会过度放大）
-const TILE_URL = (cardId: string) =>
-  `https://art.hearthstonejson.com/v1/256x/${encodeURIComponent(cardId)}.jpg`;
+// 随从卡图：构建时已本地化到 /img/cards/（方案C），加载零外部依赖
+const TILE_URL = (cardId: string) => `/img/cards/${encodeURIComponent(cardId)}.jpg`;
 // 大图预览：bgs 全卡渲染（与桌面版查询器同源）
 const RENDER_URL = (id: string) =>
   `https://art.hearthstonejson.com/v1/bgs/latest/zhCN/512x/${encodeURIComponent(id)}.png`;
