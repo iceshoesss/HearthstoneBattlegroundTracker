@@ -160,6 +160,19 @@ public class CardDatabaseService
         return Cards.GetMinionTypes();
     }
 
+    /// <summary>特殊随从：伙伴 / 扭曲虚空（默认浏览排除，仅显式筛选时返回）</summary>
+    public List<BgdbCard> GetSpecialMinions(string kind)
+    {
+        EnsureLoaded();
+        IEnumerable<BgdbCard> query = kind switch
+        {
+            "BUDDY" => Cards.Minions.Where(m => m.IsBuddy && !m.IsToken),
+            "TIMEWARPED" => Cards.Minions.Where(m => m.IsTimewarped && !m.IsToken),
+            _ => Enumerable.Empty<BgdbCard>(),
+        };
+        return query.OrderBy(m => m.Tier).ThenBy(m => m.NameZh ?? "").ToList();
+    }
+
     public List<BgdbCard> GetAllMinions()
     {
         EnsureLoaded();
@@ -240,6 +253,8 @@ public class CardDatabaseService
                 case "Taunt": tags.Add("嘲讽"); break;
                 case "Aura": tags.Add("光环"); break;
                 case "End of Turn": tags.Add("回合结束"); break;
+                case "Activate": tags.Add("发动"); break;
+                case "Choose One": tags.Add("抉择"); break;
             }
         }
         return tags;

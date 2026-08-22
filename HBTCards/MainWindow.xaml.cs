@@ -45,6 +45,7 @@ public partial class MainWindow : Window
 
     private int? _activeTier;
     private string _activeRace;     // null=全部, Title Case 种族, "NEUTRAL"
+    private string _activeSpecial;  // null=常规, "BUDDY"=伙伴, "TIMEWARPED"=扭曲虚空
     private string _activeKeyword;  // null=不限
     private MinionVM _pendingPreview;
     private readonly System.Windows.Threading.DispatcherTimer _previewTimer;
@@ -60,6 +61,8 @@ public partial class MainWindow : Window
         ("剧毒",     new[] { "Poisonous" }),
         ("风怒",     new[] { "Windfury", "Mega-Windfury" }),
         ("嘲讽",     new[] { "Taunt" }),
+        ("发动",     new[] { "Activate" }),
+        ("抉择",     new[] { "Choose One" }),
         ("光环",     new[] { "Aura" }),
         ("回合开始", new[] { "Start of Turn" }),
         ("回合结束", new[] { "End of Turn" }),
@@ -74,12 +77,26 @@ public partial class MainWindow : Window
         SectionsView.MouseLeave += CardArea_MouseLeave;
         Loaded += async (_, _) =>
         {
-            // 数据库加载较重，移出 UI 线程避免窗口假死
-            await Task.Run(() => _db.EnsureLoaded());
-            BuildTierFilters();
-            BuildRaceFilters();
-            BuildKeywordFilters();
-            ApplyFilters();
+            try
+            {
+                // 串行启动：先完成更新检查（可能退出重启），再加载库数据，最后构建界面。
+                // 旧版 DLL 与新编译代码 API 不匹配时，必须让更新提示先于数据加载执行，
+                // 否则后台线程抢先崩溃、更新提示永远弹不出来。
+                await BgdbUpdateService.CheckAndPromptAsync();
+
+                await Task.Run(() => _db.EnsureLoaded());
+
+                BuildTierFilters();
+                BuildRaceFilters();
+                BuildKeywordFilters();
+                ApplyFilters();
+            }
+            catch (Exception ex)
+            {
+                App.LogCrash("启动", ex);
+                MessageBox.Show($"初始化失败：{ex.Message}", "HBTCards",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         };
     }
 
@@ -112,7 +129,11 @@ public partial class MainWindow : Window
         AddCircleButton("全部种族", null, MakeCrownVisual());
         foreach (var r in races)
             AddCircleButton(CardDatabaseService.GetRaceChinese(r), r, MakeIconVisual(TribeIcons[r]));
-        AddCircleButton("中立", "NEUTRAL", MakeNeutralVisual());
+        AddCircleButton("中立", "NEUTRAL", MakeIconVisual("other.jpg"));
+
+        // ── 特殊：伙伴 / 时空扭曲（默认隐藏的随从类别；时空扭曲图标暂缺） ──
+        AddCircleButton("伙伴", "BUDDY", MakeIconVisual("buddy.jpg"), special: true);
+        AddCircleButton("时空扭曲", "TIMEWARPED", MakeEmptyVisual(), special: true);
     }
 
     private void BuildKeywordFilters()
@@ -138,24 +159,34 @@ public partial class MainWindow : Window
         }
     }
 
-    private void AddCircleButton(string caption, string raceCode, UIElement visual)
+    private void AddCircleButton(string caption, string raceCode, UIElement visual, bool special = false)
     {
         var btn = new ToggleButton { Style = (Style)FindResource("CircleBtn"), Tag = caption, Content = visual };
         btn.Click += (_, _) =>
         {
             if (btn.IsChecked == true)
             {
-                foreach (var c in RaceRow.Children.OfType<ToggleButton>())
-                    if (c != btn) c.IsChecked = false;
-                _activeRace = raceCode;
+                // 类型维度组内互斥（常规种族与特殊共用一个筛选槽位）
+                ClearTypeSelections(except: btn);
+                if (special) { _activeSpecial = raceCode; _activeRace = null; }
+                else { _activeRace = raceCode; _activeSpecial = null; }
             }
             else
             {
                 _activeRace = null;
+                _activeSpecial = null;
             }
             ApplyFilters();
         };
-        RaceRow.Children.Add(btn);
+        (special ? SpecialRow : RaceRow).Children.Add(btn);
+    }
+
+    private void ClearTypeSelections(ToggleButton except = null)
+    {
+        foreach (var c in RaceRow.Children.OfType<ToggleButton>())
+            if (c != except) c.IsChecked = false;
+        foreach (var c in SpecialRow.Children.OfType<ToggleButton>())
+            if (c != except) c.IsChecked = false;
     }
 
     // ═══════════════════════════════════════════════
@@ -206,7 +237,8 @@ public partial class MainWindow : Window
         return image;
     }
 
-    private UIElement MakeNeutralVisual()
+    /// <summary>空占位：深色虚空渐变圆（图标暂缺时使用）</summary>
+    private UIElement MakeEmptyVisual()
     {
         var g = new Grid();
         g.Children.Add(new System.Windows.Shapes.Ellipse
@@ -214,18 +246,9 @@ public partial class MainWindow : Window
             Fill = new LinearGradientBrush(
                 new GradientStopCollection
                 {
-                    new GradientStop(Brush(0x4a, 0x4a, 0x50).Color, 0),
-                    new GradientStop(Brush(0x23, 0x23, 0x26).Color, 1),
+                    new GradientStop(Brush(0x3a, 0x2f, 0x52).Color, 0),
+                    new GradientStop(Brush(0x17, 0x10, 0x22).Color, 1),
                 }),
-        });
-        g.Children.Add(new TextBlock
-        {
-            Text = "无",
-            FontSize = 24,
-            FontWeight = FontWeights.Bold,
-            Foreground = Brush(0x9a, 0x9a, 0xa2),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
         });
         return g;
     }
@@ -256,45 +279,67 @@ public partial class MainWindow : Window
 
     private void ApplyFilters()
     {
-        var minions = _db.SearchMinions(null, null, _activeTier);
-
-        if (_activeRace == "NEUTRAL")
-            minions = minions.Where(m => string.IsNullOrEmpty(m.MinionType)).ToList();
-        else if (!string.IsNullOrEmpty(_activeRace))
-            minions = minions.Where(m => m.MinionType == _activeRace).ToList();
-
-        if (!string.IsNullOrEmpty(_activeKeyword))
+        try
         {
-            var ens = KeywordMap.First(k => k.cn == _activeKeyword).en;
-            minions = minions.Where(m => ens.Any(en => m.HasKeyword(en))).ToList();
-        }
+            List<BgdbCard> minions;
 
-        // 分组顺序: 全部(All) → 中立 → 各种族（与游戏内浏览器一致）
-        int GroupOrder(string raw) => raw switch
-        {
-            "All" => 0,
-            "" or null => 1,
-            _ => 2 + Array.IndexOf(RaceOrder, raw),
-        };
-
-        var sections = minions
-            .GroupBy(m => m.MinionType ?? "")
-            .OrderBy(g => GroupOrder(g.Key))
-            .Select(g => new Section
+            if (_activeSpecial == "BUDDY" || _activeSpecial == "TIMEWARPED")
             {
-                Title = g.Key switch
-                {
-                    "All" => "全部",
-                    "" => "中立",
-                    _ => CardDatabaseService.GetRaceChinese(g.Key),
-                },
-                Cards = g.OrderBy(m => m.Tier ?? 0).ThenBy(m => m.NameZh ?? "").Select(CreateMinionVM).ToList(),
-            })
-            .Where(s => s.Cards.Count > 0)
-            .ToList();
+                // 特殊类别：伙伴 / 时空扭曲（常规浏览不包含这些随从）
+                minions = _db.GetSpecialMinions(_activeSpecial);
+                if (_activeTier != null)
+                    minions = minions.Where(m => m.Tier == _activeTier).ToList();
+            }
+            else
+            {
+                minions = _db.SearchMinions(null, null, _activeTier);
 
-        SectionsView.ItemsSource = sections;
-        _ = LoadImagesAsync(sections.SelectMany(s => s.Cards).ToList());
+                if (_activeRace == "NEUTRAL")
+                    minions = minions.Where(m => string.IsNullOrEmpty(m.MinionType)).ToList();
+                else if (!string.IsNullOrEmpty(_activeRace))
+                    minions = minions.Where(m => m.MinionType == _activeRace).ToList();
+            }
+
+            if (!string.IsNullOrEmpty(_activeKeyword))
+            {
+                var ens = KeywordMap.First(k => k.cn == _activeKeyword).en;
+                minions = minions.Where(m => ens.Any(en => m.HasKeyword(en))).ToList();
+            }
+
+            // 分组顺序: 全部(All) → 中立 → 各种族（与游戏内浏览器一致）
+            int GroupOrder(string raw) => raw switch
+            {
+                "All" => 0,
+                "" or null => 1,
+                _ => 2 + Array.IndexOf(RaceOrder, raw),
+            };
+
+            var sections = minions
+                .GroupBy(m => m.MinionType ?? "")
+                .OrderBy(g => GroupOrder(g.Key))
+                .Select(g => new Section
+                {
+                    Title = g.Key switch
+                    {
+                        "All" => "全部",
+                        "" => "中立",
+                        _ => CardDatabaseService.GetRaceChinese(g.Key),
+                    },
+                    Cards = g.OrderBy(m => m.Tier ?? 0).ThenBy(m => m.NameZh ?? "").Select(CreateMinionVM).ToList(),
+                })
+                .Where(s => s.Cards.Count > 0)
+                .ToList();
+
+            SectionsView.ItemsSource = sections;
+            _ = LoadImagesAsync(sections.SelectMany(s => s.Cards).ToList());
+        }
+        catch (MissingMethodException ex)
+        {
+            // 数据 DLL 版本过旧，缺少新编译代码所需的成员
+            App.LogCrash("筛选", ex);
+            MessageBox.Show("BattlegroundDB 数据版本过旧，与程序不兼容。\n请删除 BattlegroundDB.dll 后重新运行以触发自动更新。",
+                "HBTCards", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private MinionVM CreateMinionVM(BgdbCard m)

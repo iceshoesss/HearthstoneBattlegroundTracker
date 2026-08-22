@@ -16,6 +16,7 @@
   <ItemGroup>
     <Compile Include="..\Services\CardDatabaseService.cs" Link="Services\CardDatabaseService.cs" />
     <Compile Include="..\Services\ImageCacheService.cs" Link="Services\ImageCacheService.cs" />
+    <Compile Include="..\Services\BgdbUpdateService.cs" Link="Services\BgdbUpdateService.cs" />
   </ItemGroup>
 
   <!-- BattlegroundDB (HDT) 卡牌数据库 -->
@@ -41,6 +42,7 @@
   <!-- 矢量皮肤用的位图资源 -->
   <ItemGroup>
     <Resource Include="Resources\TribeIcons\*.jpg" />
+    <Resource Include="Resources\TribeIcons\*.png" />
     <Resource Include="Resources\Keywords\*.png" />
     <Resource Include="Resources\Minion\*.png" />
     <Resource Include="Resources\Tiers\*.png" />

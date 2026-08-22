@@ -212,6 +212,123 @@
             </Setter>
         </Style>
 
+        <!-- ═══════════ 纤细滚动条 ═══════════ -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Border Background="#22000000" CornerRadius="4">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand" Focusable="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Rectangle Fill="Transparent"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand" Focusable="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Rectangle Fill="Transparent"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Background="#66b99a5e">
+                                        <Thumb.Style>
+                                            <Style TargetType="Thumb">
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Thumb">
+                                                            <Border CornerRadius="4"
+                                                                    Background="{TemplateBinding Background}"
+                                                                    Margin="1.5"/>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#99ffd75e"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter Property="Background" Value="#ccffd75e"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Thumb.Style>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Border>
+                        <ControlTemplate.Triggers/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Width" Value="Auto"/>
+                    <Setter Property="Height" Value="8"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ScrollBar">
+                                <Grid Background="Transparent">
+                                    <Track x:Name="PART_Track">
+                                        <Track.DecreaseRepeatButton>
+                                            <RepeatButton Command="ScrollBar.PageLeftCommand" Focusable="False">
+                                                <RepeatButton.Template>
+                                                    <ControlTemplate TargetType="RepeatButton">
+                                                        <Rectangle Fill="Transparent"/>
+                                                    </ControlTemplate>
+                                                </RepeatButton.Template>
+                                            </RepeatButton>
+                                        </Track.DecreaseRepeatButton>
+                                        <Track.IncreaseRepeatButton>
+                                            <RepeatButton Command="ScrollBar.PageRightCommand" Focusable="False">
+                                                <RepeatButton.Template>
+                                                    <ControlTemplate TargetType="RepeatButton">
+                                                        <Rectangle Fill="Transparent"/>
+                                                    </ControlTemplate>
+                                                </RepeatButton.Template>
+                                            </RepeatButton>
+                                        </Track.IncreaseRepeatButton>
+                                        <Track.Thumb>
+                                            <Thumb Background="#66b99a5e">
+                                                <Thumb.Style>
+                                                    <Style TargetType="Thumb">
+                                                        <Setter Property="Template">
+                                                            <Setter.Value>
+                                                                <ControlTemplate TargetType="Thumb">
+                                                                    <Border CornerRadius="4"
+                                                                            Background="{TemplateBinding Background}"
+                                                                            Margin="1.5"/>
+                                                                </ControlTemplate>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                        <Style.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Background" Value="#99ffd75e"/>
+                                                            </Trigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Thumb.Style>
+                                            </Thumb>
+                                        </Track.Thumb>
+                                    </Track>
+                                </Grid>
+                                <ControlTemplate.Triggers/>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
     </Window.Resources>
 
     <Grid>
@@ -300,6 +417,13 @@
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
                         <UniformGrid x:Name="RaceRow" Columns="2" Margin="14,8,14,0"/>
+                        <Grid Height="32" Margin="14,14,14,0">
+                            <Path Data="M0,6 L10,0 H110 L120,6 L110,12 H10 Z" Fill="{StaticResource BannerBg}"
+                                  Stroke="#b08d4f" StrokeThickness="1" Stretch="Uniform"/>
+                            <TextBlock Text="特  殊" FontSize="13" FontWeight="Bold" Foreground="#e8d5a2"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                        <UniformGrid x:Name="SpecialRow" Columns="2" Margin="14,8,14,0"/>
                     </StackPanel>
                 </Border>
             </Grid>
