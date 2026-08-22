@@ -197,7 +197,7 @@ function MinionCard({ c, onSelect }: { c: CardData; onSelect: () => void }) {
           <img
             src={TILE_URL(c.cardId)}
             alt={c.nameZh}
-            loading="lazy"
+            decoding="async"
             className="absolute"
             style={{
               width: 256,
