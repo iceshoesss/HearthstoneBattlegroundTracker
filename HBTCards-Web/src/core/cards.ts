@@ -20,6 +20,14 @@ export interface CardData {
   trinketTier?: 'lesser' | 'greater' | null; // 饰品：小/大
   armor?: number | null; // 英雄护甲值
   isDarkGift?: boolean; // 黑暗之赐（选取法术 childIds 圈定，从法术中拆分展示）
+  heroPower?: {
+    cardId: string;
+    name: string;
+    nameZh: string;
+    textZh: string;
+    manaCost: number | null;
+    keywords: string[];
+  } | null; // 英雄技能（仅英雄类型有值）
 }
 
 export interface CardsDb {

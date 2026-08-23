@@ -36,31 +36,57 @@ const cards = raw.cards
   }))
   .sort((a, b) => (a.tier - b.tier) || a.nameZh.localeCompare(b.nameZh, 'zh'));
 
-// 非随从类型：法术 / 异变 / 任务 / 奖励 / 饰品 / 英雄（hero_power 不收录）
+// 构建英雄技能 id → 技能数据 映射（用于给英雄附加 heroPower 信息）
+const heroPowerById = new Map(
+  raw.cards
+    .filter(c => c.cardType === 'hero_power' && !c.isToken)
+    .map(c => [c.id, c])
+);
+
+// 非随从类型：法术 / 异变 / 任务 / 奖励 / 饰品 / 英雄（hero_power 不单独收录，仅附加到英雄）
 // 注：仅双人模式的异变（isDuosOnly）是有意保留的 —— 异变本身就是双人模式机制
 const otherTypes = ['spell', 'anomaly', 'quest', 'reward', 'trinket', 'hero'];
 const others = raw.cards
   .filter(c => otherTypes.includes(c.cardType) && !c.isToken)
-  .map(c => ({
-    cardId: c.cardId,
-    goldenCardId: c.dbfIdGold ? byDbfId.get(c.dbfIdGold)?.cardId ?? `${c.cardId}_G` : `${c.cardId}_G`,
-    name: (c.name || '').trim(),
-    nameZh: (c.nameZh || '').trim(),
-    textZh: c.textZh || '',
-    cardType: c.cardType,
-    tier: c.tier ?? null,
-    manaCost: c.manaCost ?? null,
-    trinketTier: c.trinketTier ?? null,
-    armor: c.armor ?? null, // 英雄护甲值
-    minionType: '',
-    attack: 0,
-    health: 0,
-    keywords: c.keywords ?? [],
-    isBuddy: false,
-    isTimewarped: !!c.isTimewarped, // 注：时空扭曲法术确实存在（如各英雄「XX之力」，共 32 张）
-    isDarkGift: darkGiftIds.has(c.id),
-    dbfIdGold: c.dbfIdGold ?? null,
-  }));
+  .map(c => {
+    // 英雄：从 childIds 中提取 hero_power 技能信息
+    let heroPower = null;
+    if (c.cardType === 'hero' && c.childIds) {
+      const hpId = c.childIds.find(id => heroPowerById.has(id));
+      if (hpId) {
+        const hp = heroPowerById.get(hpId);
+        heroPower = {
+          cardId: hp.cardId,
+          name: (hp.name || '').trim(),
+          nameZh: (hp.nameZh || '').trim(),
+          textZh: hp.textZh || '',
+          manaCost: hp.manaCost ?? null,
+          keywords: hp.keywords ?? [],
+        };
+      }
+    }
+    return {
+      cardId: c.cardId,
+      goldenCardId: c.dbfIdGold ? byDbfId.get(c.dbfIdGold)?.cardId ?? `${c.cardId}_G` : `${c.cardId}_G`,
+      name: (c.name || '').trim(),
+      nameZh: (c.nameZh || '').trim(),
+      textZh: c.textZh || '',
+      cardType: c.cardType,
+      tier: c.tier ?? null,
+      manaCost: c.manaCost ?? null,
+      trinketTier: c.trinketTier ?? null,
+      armor: c.armor ?? null, // 英雄护甲值
+      minionType: '',
+      attack: 0,
+      health: 0,
+      keywords: c.keywords ?? [],
+      isBuddy: false,
+      isTimewarped: !!c.isTimewarped, // 注：时空扭曲法术确实存在（如各英雄「XX之力」，共 32 张）
+      isDarkGift: darkGiftIds.has(c.id),
+      dbfIdGold: c.dbfIdGold ?? null,
+      heroPower, // 英雄技能（仅英雄类型有值）
+    };
+  });
 
 // 排序：按类型顺序（spell → anomaly → quest → reward → trinket），组内 tier → manaCost → 名称
 others.sort((a, b) =>
