@@ -15,6 +15,9 @@ const TILE_URL = (cardId: string) => `/img/cards/${encodeURIComponent(cardId)}.j
 const RENDER_URL = (id: string) =>
   `https://art.hearthstonejson.com/v1/bgs/latest/zhCN/512x/${encodeURIComponent(id)}.png`;
 const OVERLAY = (name: string) => `/img/minions/${name}.png`;
+// 英雄带框头像：拱形边框已烘焙在图内（256x272 透明底），与 HDT 同源
+const HERO_URL = (cardId: string) =>
+  `https://art.hearthstonejson.com/v1/heroes/latest/256x/${encodeURIComponent(cardId)}.png`;
 
 // 种族 → 图标（与桌面版一致：Beast 用 pet.jpg，中立用 other.jpg）
 const RACE_ICON: Record<string, string> = {
@@ -155,6 +158,7 @@ const EXTRA_GLYPH: Record<ExtraSpecial, { glyph: string; from: string; to: strin
   QUESTS: { glyph: '⚑', from: '#b45309', to: '#71330f' },
   TRINKETS: { glyph: '◆', from: '#15803d', to: '#14532d' },
   DARK_GIFTS: { glyph: '☾', from: '#4c1d95', to: '#17103a' },
+  HEROES: { glyph: '✪', from: '#1d4ed8', to: '#172554' },
 };
 
 function GlyphCircle({ es }: { es: ExtraSpecial }) {
@@ -172,6 +176,7 @@ function GlyphCircle({ es }: { es: ExtraSpecial }) {
 /* ═══════════ 特殊类别平铺整卡渲染图（非随从样式；渲染图自带费用/等级，无需额外徽章） ═══════════ */
 function SpecialTile({ c, onSelect }: { c: CardData; onSelect: () => void }) {
   const [failed, setFailed] = useState(false);
+  const isHero = c.cardType === 'hero';
 
   if (failed)
     return (
@@ -192,7 +197,7 @@ function SpecialTile({ c, onSelect }: { c: CardData; onSelect: () => void }) {
       title={c.nameZh}
     >
       <img
-        src={RENDER_URL(c.cardId)}
+        src={isHero ? HERO_URL(c.cardId) : RENDER_URL(c.cardId)}
         alt={c.nameZh}
         loading="lazy"
         decoding="async"
@@ -201,6 +206,15 @@ function SpecialTile({ c, onSelect }: { c: CardData; onSelect: () => void }) {
         className="h-full w-full object-contain drop-shadow-lg"
         onError={() => setFailed(true)}
       />
+      {/* 英雄护甲盾徽（图源：HDT Resources/armor.png） */}
+      {isHero && typeof c.armor === 'number' && (
+        <div className="absolute bottom-[4px] right-[4px] h-[104px] w-[104px] drop-shadow-md">
+          <img src="/img/heroes/armor.png" alt="" className="absolute inset-0 h-full w-full" />
+          <span className="absolute inset-0 z-10 flex items-center justify-center text-[30px] font-bold text-white [text-shadow:_0_1px_3px_rgb(0_0_0_/_90%)]">
+            {c.armor}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -357,6 +371,7 @@ export default function App() {
       reward: 0,
       trinket: 0,
       darkGift: 0,
+      hero: 0,
     };
     db?.cards.forEach(c => {
       // 伙伴 / 时空扭曲优先归类（随从与法术都可能带时空扭曲标记）
@@ -383,7 +398,12 @@ export default function App() {
   const extraTotal = (es: ExtraSpecial): number => {
     if (es === 'QUESTS') return catTotals.quest + catTotals.reward;
     if (es === 'DARK_GIFTS') return catTotals.darkGift;
-    const key = { SPELLS: 'spell', ANOMALIES: 'anomaly', TRINKETS: 'trinket' } as const;
+    const key = {
+      SPELLS: 'spell',
+      ANOMALIES: 'anomaly',
+      TRINKETS: 'trinket',
+      HEROES: 'hero',
+    } as const;
     return catTotals[key[es]] ?? 0;
   };
   let countLabel: string;
@@ -538,7 +558,9 @@ export default function App() {
                 >
                   <VoidCircle />
                 </CircleButton>
-                {(['SPELLS', 'ANOMALIES', 'QUESTS', 'TRINKETS', 'DARK_GIFTS'] as ExtraSpecial[]).map(es => (
+                {(
+                  ['SPELLS', 'ANOMALIES', 'QUESTS', 'TRINKETS', 'DARK_GIFTS', 'HEROES'] as ExtraSpecial[]
+                ).map(es => (
                   <CircleButton
                     key={es}
                     caption={EXTRA_META[es].label}
@@ -588,18 +610,29 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
         </button>
 
         <div className="flex gap-3">
-          <img
-            src={RENDER_URL(card.cardId)}
-            alt={card.nameZh}
-            className="w-[280px] rounded-md bg-zinc-900/80"
-          />
-          <img
-            key={card.goldenCardId}
-            src={RENDER_URL(card.goldenCardId + '_triple')}
-            alt=""
-            className="w-[280px] rounded-md ring-1 ring-amber-400/50 bg-zinc-900/80"
-            onError={e => ((e.target as HTMLImageElement).style.display = 'none')}
-          />
+          {/* 英雄无 bgs 整卡渲染，直接放大带框头像 */}
+          {card.cardType === 'hero' ? (
+            <img
+              src={HERO_URL(card.cardId)}
+              alt={card.nameZh}
+              className="w-[280px] rounded-md bg-zinc-900/80"
+            />
+          ) : (
+            <>
+              <img
+                src={RENDER_URL(card.cardId)}
+                alt={card.nameZh}
+                className="w-[280px] rounded-md bg-zinc-900/80"
+              />
+              <img
+                key={card.goldenCardId}
+                src={RENDER_URL(card.goldenCardId + '_triple')}
+                alt=""
+                className="w-[280px] rounded-md ring-1 ring-amber-400/50 bg-zinc-900/80"
+                onError={e => ((e.target as HTMLImageElement).style.display = 'none')}
+              />
+            </>
+          )}
         </div>
 
         <div className="min-w-[568px] border-t border-[#77572e]/50 pt-2.5">
