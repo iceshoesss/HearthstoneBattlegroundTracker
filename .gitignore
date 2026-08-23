@@ -21,7 +21,11 @@ node_modules/
 dist/
 HBTCards-Web/raw_bg_cards.json
 
-# ÔËÐÐÊ±Êý¾ÝÓë±¾µØ¹¤¾ß
+# æœ¬åœ°å·¥å…·ç¼“å­˜
+.playwright-mcp/
+.vite/
+
+# ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ë±¾ï¿½Ø¹ï¿½ï¿½ï¿½
 *.db
 *.db-shm
 *.db-wal
