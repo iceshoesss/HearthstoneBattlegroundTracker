@@ -7,6 +7,11 @@ const raw = JSON.parse(readFileSync(new URL('../raw_bg_cards.json', import.meta.
 // dbfId → cardId 全量表，用于解析金色版本 cardId
 const byDbfId = new Map(raw.cards.map(c => [c.id, c]));
 
+// 黑暗之赐：由选取法术 BG36_MidGameEffect_000 的 childIds 精确圈定
+// （不能用 cardId 前缀 _000t 匹配 —— 会混入黑暗之赐衍生出的二级 token，如 t28t/t29t）
+const darkGiftParent = raw.cards.find(c => c.cardId === 'BG36_MidGameEffect_000');
+const darkGiftIds = new Set(darkGiftParent?.childIds ?? []);
+
 const cards = raw.cards
   .filter(c => c.cardType === 'minion' && !c.isToken && !c.isDuosOnly)
   .map(c => ({
@@ -25,6 +30,7 @@ const cards = raw.cards
     keywords: c.keywords ?? [],
     isBuddy: !!c.isBuddy,
     isTimewarped: !!c.isTimewarped,
+    isDarkGift: false,
     dbfIdGold: c.dbfIdGold ?? null,
   }))
   .sort((a, b) => (a.tier - b.tier) || a.nameZh.localeCompare(b.nameZh, 'zh'));
@@ -49,7 +55,8 @@ const others = raw.cards
     health: 0,
     keywords: c.keywords ?? [],
     isBuddy: false,
-    isTimewarped: false,
+    isTimewarped: !!c.isTimewarped, // 注：时空扭曲法术确实存在（如各英雄「XX之力」，共 32 张）
+    isDarkGift: darkGiftIds.has(c.id),
     dbfIdGold: c.dbfIdGold ?? null,
   }));
 
@@ -74,5 +81,8 @@ writeFileSync(new URL('../public/data/cards.json', import.meta.url), JSON.string
 
 const byType = {};
 for (const c of all) byType[c.cardType] = (byType[c.cardType] || 0) + 1;
+const darkGiftCount = all.filter(c => c.isDarkGift).length;
 const breakdown = Object.entries(byType).map(([t, n]) => `${t} ${n}`).join(', ');
-console.log(`cards.json 生成完毕: v${out.version}, 共 ${out.count} 张 (${breakdown})`);
+console.log(
+  `cards.json 生成完毕: v${out.version}, 共 ${out.count} 张 (${breakdown}), 黑暗之赐 ${darkGiftCount}`,
+);
