@@ -609,14 +609,22 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
           ✕
         </button>
 
-        <div className="flex gap-3">
-          {/* 英雄无 bgs 整卡渲染，直接放大带框头像 */}
-          {card.cardType === 'hero' ? (
-            <img
-              src={HERO_URL(card.cardId)}
-              alt={card.nameZh}
-              className="w-[280px] rounded-md bg-zinc-900/80"
-            />
+        <div className="flex justify-center gap-3">
+          {/* 非随从单位（法术/畸变/任务/饰品/黑暗之赐/英雄）无金色版本，只显示一张图片 */}
+          {(card.cardType && card.cardType !== 'minion') ? (
+            card.cardType === 'hero' ? (
+              <img
+                src={HERO_URL(card.cardId)}
+                alt={card.nameZh}
+                className="w-[280px] rounded-md bg-zinc-900/80"
+              />
+            ) : (
+              <img
+                src={RENDER_URL(card.cardId)}
+                alt={card.nameZh}
+                className="w-[280px] rounded-md bg-zinc-900/80"
+              />
+            )
           ) : (
             <>
               <img
