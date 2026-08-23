@@ -24,6 +24,7 @@ const cards = raw.cards
     tier: c.tier ?? 0,
     manaCost: null,
     trinketTier: null,
+    armor: null,
     minionType: c.minionType ?? '',
     attack: c.attack ?? 0,
     health: c.health ?? 0,
@@ -35,9 +36,9 @@ const cards = raw.cards
   }))
   .sort((a, b) => (a.tier - b.tier) || a.nameZh.localeCompare(b.nameZh, 'zh'));
 
-// 非随从类型：法术 / 异变 / 任务 / 奖励 / 饰品（hero 与 hero_power 不收录）
+// 非随从类型：法术 / 异变 / 任务 / 奖励 / 饰品 / 英雄（hero_power 不收录）
 // 注：仅双人模式的异变（isDuosOnly）是有意保留的 —— 异变本身就是双人模式机制
-const otherTypes = ['spell', 'anomaly', 'quest', 'reward', 'trinket'];
+const otherTypes = ['spell', 'anomaly', 'quest', 'reward', 'trinket', 'hero'];
 const others = raw.cards
   .filter(c => otherTypes.includes(c.cardType) && !c.isToken)
   .map(c => ({
@@ -50,6 +51,7 @@ const others = raw.cards
     tier: c.tier ?? null,
     manaCost: c.manaCost ?? null,
     trinketTier: c.trinketTier ?? null,
+    armor: c.armor ?? null, // 英雄护甲值
     minionType: '',
     attack: 0,
     health: 0,

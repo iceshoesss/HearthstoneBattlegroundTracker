@@ -15,9 +15,10 @@ export interface CardData {
   isTimewarped: boolean;
   dbfIdGold: number | null;
   // ── 全类型扩展（旧版 cards.json 无 cardType 时按随从处理）──
-  cardType?: 'minion' | 'spell' | 'anomaly' | 'quest' | 'reward' | 'trinket';
+  cardType?: 'minion' | 'spell' | 'anomaly' | 'quest' | 'reward' | 'trinket' | 'hero';
   manaCost?: number | null; // 法术/畸变/饰品费用
   trinketTier?: 'lesser' | 'greater' | null; // 饰品：小/大
+  armor?: number | null; // 英雄护甲值
   isDarkGift?: boolean; // 黑暗之赐（选取法术 childIds 圈定，从法术中拆分展示）
 }
 
@@ -28,6 +29,8 @@ export interface CardsDb {
   cards: CardData[];
 }
 
+export type CardType = NonNullable<CardData['cardType']>;
+
 export type SpecialFilter =
   | 'BUDDY'
   | 'TIMEWARPED'
@@ -37,6 +40,7 @@ export type SpecialFilter =
   | 'QUESTS'
   | 'TRINKETS'
   | 'DARK_GIFTS'
+  | 'HEROES'
   | null;
 
 export type ExtraSpecial = Exclude<SpecialFilter, 'BUDDY' | 'TIMEWARPED' | null>;
@@ -48,7 +52,8 @@ export function isExtraSpecial(s: SpecialFilter): s is ExtraSpecial {
     s === 'ANOMALIES' ||
     s === 'QUESTS' ||
     s === 'TRINKETS' ||
-    s === 'DARK_GIFTS'
+    s === 'DARK_GIFTS' ||
+    s === 'HEROES'
   );
 }
 
@@ -59,6 +64,7 @@ export const EXTRA_META: Record<ExtraSpecial, { label: string; unit: string }> =
   QUESTS: { label: '任务', unit: '个任务（含奖励）' },
   TRINKETS: { label: '饰品', unit: '件饰品' },
   DARK_GIFTS: { label: '黑暗之赐', unit: '张黑暗之赐' },
+  HEROES: { label: '英雄', unit: '名英雄' },
 };
 
 export interface Filters {
@@ -166,6 +172,8 @@ function applyExtraSpecial(db: CardsDb, f: Filters): Section[] {
         return typeOf(c) === 'trinket';
       case 'DARK_GIFTS':
         return !!c.isDarkGift;
+      case 'HEROES':
+        return typeOf(c) === 'hero';
       default:
         return false;
     }
@@ -197,6 +205,8 @@ function applyExtraSpecial(db: CardsDb, f: Filters): Section[] {
       ];
     case 'DARK_GIFTS':
       return buildSection('黑暗之赐', 0, sub, byNameZh);
+    case 'HEROES':
+      return buildSection('英雄', 0, sub, byNameZh);
     default:
       return [];
   }
