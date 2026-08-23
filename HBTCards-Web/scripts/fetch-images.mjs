@@ -15,6 +15,8 @@ async function worker() {
   while (true) {
     const c = list.pop();
     if (!c) break;
+    // 只下载随从图；非随从类型（法术/异变/任务/奖励/饰品）不渲染整卡图
+    if (c.cardType && c.cardType !== 'minion') continue;
     const file = new URL(c.cardId + '.jpg', outDir);
     if (existsSync(file)) {
       skipped++;

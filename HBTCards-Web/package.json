@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/fetch-data.mjs && node scripts/fetch-images.mjs",
+    "prebuild": "node scripts/build-data.mjs && node scripts/fetch-images.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "update-data": "node scripts/build-data.mjs"
