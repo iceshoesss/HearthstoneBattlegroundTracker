@@ -643,8 +643,31 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
               {card.minionType
                 ? `${card.tier != null && card.tier > 0 ? ' · ' : ''}${RACE_CN[card.minionType] ?? ''}`
                 : ''}
+              {card.armor != null && card.armor > 0 ? ` · 护甲 ${card.armor}` : ''}
             </span>
           </div>
+          {/* 英雄技能 */}
+          {card.cardType === 'hero' && card.heroPower && (
+            <div className="mt-2 rounded-md border border-[#77572e]/40 bg-[#1a1208]/80 p-2.5">
+              <div className="flex items-center gap-2 text-xs text-zinc-400">
+                <span className="font-bold text-amber-300">英雄技能</span>
+                {card.heroPower.manaCost != null && (
+                  <span className="rounded bg-blue-900/50 px-1.5 py-0.5 text-[10px] text-blue-300">
+                    {card.heroPower.manaCost} 费
+                  </span>
+                )}
+              </div>
+              <div className="mt-1 text-sm font-bold text-amber-200">
+                {card.heroPower.nameZh || card.heroPower.name}
+              </div>
+              {card.heroPower.textZh && (
+                <div
+                  className="mt-1 text-xs leading-relaxed text-zinc-300 [&_b]:text-amber-200"
+                  dangerouslySetInnerHTML={{ __html: card.heroPower.textZh }}
+                />
+              )}
+            </div>
+          )}
           {card.textZh && (
             <div
               className="mt-1.5 text-sm leading-relaxed text-zinc-300 [&_b]:text-amber-200"
