@@ -154,6 +154,7 @@ const EXTRA_GLYPH: Record<ExtraSpecial, { glyph: string; from: string; to: strin
   ANOMALIES: { glyph: '◉', from: '#0e7490', to: '#134e4a' },
   QUESTS: { glyph: '⚑', from: '#b45309', to: '#71330f' },
   TRINKETS: { glyph: '◆', from: '#15803d', to: '#14532d' },
+  DARK_GIFTS: { glyph: '☾', from: '#4c1d95', to: '#17103a' },
 };
 
 function GlyphCircle({ es }: { es: ExtraSpecial }) {
@@ -345,8 +346,34 @@ export default function App() {
   const extraMode = extraSpecial != null;
   // 各类别总数（不受筛选影响，用于副标题计数；旧数据无 cardType 按随从计）
   const catTotals = useMemo(() => {
-    const t = { minion: 0, spell: 0, anomaly: 0, quest: 0, reward: 0, trinket: 0 };
+    const t = {
+      minion: 0,
+      buddy: 0,
+      timewarpMinion: 0,
+      timewarpSpell: 0,
+      spell: 0,
+      anomaly: 0,
+      quest: 0,
+      reward: 0,
+      trinket: 0,
+      darkGift: 0,
+    };
     db?.cards.forEach(c => {
+      // 伙伴 / 时空扭曲优先归类（随从与法术都可能带时空扭曲标记）
+      if (c.isBuddy) {
+        t.buddy++;
+        return;
+      }
+      if (c.isTimewarped) {
+        if ((c.cardType ?? 'minion') === 'minion') t.timewarpMinion++;
+        else if (c.cardType === 'spell') t.timewarpSpell++;
+        return;
+      }
+      // 黑暗之赐虽是 spell 类型，但已拆分为独立类别，单独计数
+      if ((c.cardType ?? 'minion') === 'spell' && c.isDarkGift) {
+        t.darkGift++;
+        return;
+      }
       const k = c.cardType ?? 'minion';
       if (k in t) t[k as keyof typeof t]++;
     });
@@ -355,13 +382,20 @@ export default function App() {
   // 副标题计数文案
   const extraTotal = (es: ExtraSpecial): number => {
     if (es === 'QUESTS') return catTotals.quest + catTotals.reward;
+    if (es === 'DARK_GIFTS') return catTotals.darkGift;
     const key = { SPELLS: 'spell', ANOMALIES: 'anomaly', TRINKETS: 'trinket' } as const;
     return catTotals[key[es]] ?? 0;
   };
-  const countLabel =
-    meta && extraSpecial
-      ? `共 ${extraTotal(extraSpecial)} ${meta.unit} · 点击查看详情`
-      : `共 ${catTotals.minion} 名随从 · 点击卡片查看详情`;
+  let countLabel: string;
+  if (filters.special === 'TIMEWARPED') {
+    countLabel = `共 ${catTotals.timewarpMinion + catTotals.timewarpSpell} 张（随从 ${catTotals.timewarpMinion} · 法术 ${catTotals.timewarpSpell}）· 点击查看详情`;
+  } else if (filters.special === 'BUDDY') {
+    countLabel = `共 ${catTotals.buddy} 名伙伴 · 点击查看详情`;
+  } else if (meta && extraSpecial) {
+    countLabel = `共 ${extraTotal(extraSpecial)} ${meta.unit} · 点击查看详情`;
+  } else {
+    countLabel = `共 ${catTotals.minion} 名随从 · 点击卡片查看详情`;
+  }
 
   return (
     <div className="flex min-h-screen items-start justify-center p-[14px]">
@@ -422,28 +456,29 @@ export default function App() {
                   <div className="py-24 text-center text-zinc-300/70">加载中…</div>
                 ) : total === 0 ? (
                   <div className="py-24 text-center text-zinc-300/60">
-                    没有符合条件的{meta?.label ?? '随从'}
+                    没有符合条件的{meta?.label ?? '卡牌'}
                   </div>
-                ) : extraMode ? (
-                  /* 特殊类别：平铺整卡渲染图（分段：任务/奖励、小/大饰品） */
-                  sections.map(s => (
-                    <section key={s.title}>
-                      <SectionHeader title={s.title} count={s.cards.length} />
-                      <div className="flex flex-wrap justify-center pb-2">
-                        {s.cards.map(c => (
-                          <SpecialTile key={c.cardId} c={c} onSelect={() => setPreviewCard(c)} />
-                        ))}
-                      </div>
-                    </section>
-                  ))
                 ) : (
+                  /* 按分段的 kind 渲染：minion=合成随从卡；render=整卡渲染图（时空扭曲为混合模式） */
                   sections.map(s => (
-                    <section key={s.title}>
+                    <section key={`${s.kind}-${s.title}`}>
                       <SectionHeader title={s.title} count={s.cards.length} />
                       <div className="flex flex-wrap justify-center pb-2">
-                        {s.cards.map(c => (
-                          <MinionCard key={c.cardId} c={c} onSelect={() => setPreviewCard(c)} />
-                        ))}
+                        {s.cards.map(c =>
+                          s.kind === 'render' ? (
+                            <SpecialTile
+                              key={c.cardId}
+                              c={c}
+                              onSelect={() => setPreviewCard(c)}
+                            />
+                          ) : (
+                            <MinionCard
+                              key={c.cardId}
+                              c={c}
+                              onSelect={() => setPreviewCard(c)}
+                            />
+                          ),
+                        )}
                       </div>
                     </section>
                   ))
@@ -503,7 +538,7 @@ export default function App() {
                 >
                   <VoidCircle />
                 </CircleButton>
-                {(['SPELLS', 'ANOMALIES', 'QUESTS', 'TRINKETS'] as ExtraSpecial[]).map(es => (
+                {(['SPELLS', 'ANOMALIES', 'QUESTS', 'TRINKETS', 'DARK_GIFTS'] as ExtraSpecial[]).map(es => (
                   <CircleButton
                     key={es}
                     caption={EXTRA_META[es].label}
