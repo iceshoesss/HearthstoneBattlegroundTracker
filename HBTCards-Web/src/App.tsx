@@ -1,6 +1,13 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import type { CardData, CardsDb, Filters, Section } from './core/cards';
-import { applyFilters, KEYWORD_FILTERS, RACE_CN, RACE_ORDER } from './core/cards';
+import type { CardData, CardsDb, ExtraSpecial, Filters, Section } from './core/cards';
+import {
+  applyFilters,
+  EXTRA_META,
+  isExtraSpecial,
+  KEYWORD_FILTERS,
+  RACE_CN,
+  RACE_ORDER,
+} from './core/cards';
 
 // 随从卡图：构建时已本地化到 /img/cards/（方案C），加载零外部依赖
 const TILE_URL = (cardId: string) => `/img/cards/${encodeURIComponent(cardId)}.jpg`;
@@ -141,6 +148,62 @@ function VoidCircle() {
   );
 }
 
+/* ═══════════ 新特殊类别圆形图标（渐变 + 符号，无专用图素材） ═══════════ */
+const EXTRA_GLYPH: Record<ExtraSpecial, { glyph: string; from: string; to: string }> = {
+  SPELLS: { glyph: '✦', from: '#6d3fd4', to: '#2b1a5e' },
+  ANOMALIES: { glyph: '◉', from: '#0e7490', to: '#134e4a' },
+  QUESTS: { glyph: '⚑', from: '#b45309', to: '#71330f' },
+  TRINKETS: { glyph: '◆', from: '#15803d', to: '#14532d' },
+};
+
+function GlyphCircle({ es }: { es: ExtraSpecial }) {
+  const g = EXTRA_GLYPH[es];
+  return (
+    <div
+      className="flex h-full w-full items-center justify-center rounded-full text-[26px] leading-none text-[#ffe9a8]"
+      style={{ background: `linear-gradient(to bottom, ${g.from}, ${g.to})` }}
+    >
+      {g.glyph}
+    </div>
+  );
+}
+
+/* ═══════════ 特殊类别平铺整卡渲染图（非随从样式；渲染图自带费用/等级，无需额外徽章） ═══════════ */
+function SpecialTile({ c, onSelect }: { c: CardData; onSelect: () => void }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed)
+    return (
+      <div
+        className="mx-[5px] my-[5px] flex h-[315px] w-[315px] cursor-pointer items-center justify-center rounded-md border border-[#77572e]/60 bg-[#1a1410] p-4 text-center text-base leading-relaxed text-[#d9c184]"
+        onClick={onSelect}
+        title={c.nameZh}
+      >
+        {c.nameZh || c.name}
+      </div>
+    );
+
+  return (
+    <div
+      className="relative mx-[5px] my-[5px] cursor-pointer transition-transform hover:scale-[1.03]"
+      style={{ width: 315, height: 315 }}
+      onClick={onSelect}
+      title={c.nameZh}
+    >
+      <img
+        src={RENDER_URL(c.cardId)}
+        alt={c.nameZh}
+        loading="lazy"
+        decoding="async"
+        width={315}
+        height={315}
+        className="h-full w-full object-contain drop-shadow-lg"
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
+}
+
 /* ═══════════ 关键词 chip（桌面版 PanelBg 风格） ═══════════ */
 function KeywordChip({ cn, active, onClick }: { cn: string; active: boolean; onClick: () => void }) {
   return (
@@ -184,7 +247,7 @@ function MinionCard({ c, onSelect }: { c: CardData; onSelect: () => void }) {
     >
       {/* 星级盾徽（约 1/3 压在头像上） */}
       <img
-        src={`/img/tiers/tier-${Math.max(1, Math.min(7, c.tier))}.png`}
+        src={`/img/tiers/tier-${Math.max(1, Math.min(7, c.tier ?? 1))}.png`}
         alt=""
         className="absolute z-30 drop-shadow-md"
         style={{ top: 4, left: '50%', marginLeft: -26, width: 52 }}
@@ -274,6 +337,32 @@ export default function App() {
   const selectSpecial = (special: Filters['special']) =>
     setFilters(f => ({ ...f, special: f.special === special ? null : special }));
 
+  /* ── 特殊非随从类别模式（法术/畸变/任务/饰品：平铺整卡渲染图） ── */
+  const extraSpecial: ExtraSpecial | null = isExtraSpecial(filters.special)
+    ? filters.special
+    : null;
+  const meta = extraSpecial ? EXTRA_META[extraSpecial] : null;
+  const extraMode = extraSpecial != null;
+  // 各类别总数（不受筛选影响，用于副标题计数；旧数据无 cardType 按随从计）
+  const catTotals = useMemo(() => {
+    const t = { minion: 0, spell: 0, anomaly: 0, quest: 0, reward: 0, trinket: 0 };
+    db?.cards.forEach(c => {
+      const k = c.cardType ?? 'minion';
+      if (k in t) t[k as keyof typeof t]++;
+    });
+    return t;
+  }, [db]);
+  // 副标题计数文案
+  const extraTotal = (es: ExtraSpecial): number => {
+    if (es === 'QUESTS') return catTotals.quest + catTotals.reward;
+    const key = { SPELLS: 'spell', ANOMALIES: 'anomaly', TRINKETS: 'trinket' } as const;
+    return catTotals[key[es]] ?? 0;
+  };
+  const countLabel =
+    meta && extraSpecial
+      ? `共 ${extraTotal(extraSpecial)} ${meta.unit} · 点击查看详情`
+      : `共 ${catTotals.minion} 名随从 · 点击卡片查看详情`;
+
   return (
     <div className="flex min-h-screen items-start justify-center p-[14px]">
       <div className="wood-frame w-full max-w-[1560px] rounded-[22px] border-2 border-[#241708] p-1 lg:h-[calc(100vh-28px)]">
@@ -283,7 +372,13 @@ export default function App() {
             {/* ───── 左：等级 + 关键词 ───── */}
             <Panel>
               <Banner label="等 级" />
-              <div className="grid grid-cols-2 px-[14px] pt-2">
+              {/* 法术模式下等级筛选可用；其余特殊类别下置灰（保留已选状态，返回随从模式恢复生效） */}
+              <div
+                aria-disabled={extraMode && filters.special !== 'SPELLS'}
+                className={`grid grid-cols-2 px-[14px] pt-2 transition-opacity ${
+                  extraMode && filters.special !== 'SPELLS' ? 'pointer-events-none opacity-40' : ''
+                }`}
+              >
                 {[1, 2, 3, 4, 5, 6, 7].map(t => (
                   <TierButton
                     key={t}
@@ -314,17 +409,33 @@ export default function App() {
             <main className="felt-bg relative mx-0 flex min-h-0 flex-col overflow-hidden rounded-[14px] border-2 border-[#20142e] lg:mx-0">
               <div className="flex shrink-0 flex-col items-center pt-[10px]">
                 <div className="parchment flex h-[34px] w-[430px] max-w-[92%] items-center justify-center rounded-md border border-[#8a7345] shadow-lg">
-                  <span className="text-base font-bold tracking-widest text-[#3a2c18]">随 从</span>
+                  <span className="text-base font-bold tracking-widest text-[#3a2c18]">
+                    {meta ? meta.label.split('').join(' ') : '随 从'}
+                  </span>
                 </div>
                 <span className="mt-1 text-[11px] tracking-wide text-[#d9c184]/55">
-                  BattlegroundDB v{db?.version ?? '…'} · 共 {db?.count ?? 0} 名随从 · 点击卡片查看详情
+                  BattlegroundDB v{db?.version ?? '…'} · {countLabel}
                 </span>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1">
                 {!db ? (
                   <div className="py-24 text-center text-zinc-300/70">加载中…</div>
                 ) : total === 0 ? (
-                  <div className="py-24 text-center text-zinc-300/60">没有符合条件的随从</div>
+                  <div className="py-24 text-center text-zinc-300/60">
+                    没有符合条件的{meta?.label ?? '随从'}
+                  </div>
+                ) : extraMode ? (
+                  /* 特殊类别：平铺整卡渲染图（分段：任务/奖励、小/大饰品） */
+                  sections.map(s => (
+                    <section key={s.title}>
+                      <SectionHeader title={s.title} count={s.cards.length} />
+                      <div className="flex flex-wrap justify-center pb-2">
+                        {s.cards.map(c => (
+                          <SpecialTile key={c.cardId} c={c} onSelect={() => setPreviewCard(c)} />
+                        ))}
+                      </div>
+                    </section>
+                  ))
                 ) : (
                   sections.map(s => (
                     <section key={s.title}>
@@ -343,7 +454,13 @@ export default function App() {
             {/* ───── 右：类型 + 特殊 ───── */}
             <Panel>
               <Banner label="类 型" />
-              <div className="grid grid-cols-2 px-[14px] pt-2">
+              {/* 特殊非随从类别下种族筛选不生效，置灰（保留已选状态） */}
+              <div
+                aria-disabled={extraMode}
+                className={`grid grid-cols-2 px-[14px] pt-2 transition-opacity ${
+                  extraMode ? 'pointer-events-none opacity-40' : ''
+                }`}
+              >
                 <CircleButton
                   caption="全部种族"
                   active={!filters.race}
@@ -386,6 +503,16 @@ export default function App() {
                 >
                   <VoidCircle />
                 </CircleButton>
+                {(['SPELLS', 'ANOMALIES', 'QUESTS', 'TRINKETS'] as ExtraSpecial[]).map(es => (
+                  <CircleButton
+                    key={es}
+                    caption={EXTRA_META[es].label}
+                    active={filters.special === es}
+                    onClick={() => selectSpecial(es)}
+                  >
+                    <GlyphCircle es={es} />
+                  </CircleButton>
+                ))}
               </div>
             </Panel>
           </div>
@@ -444,7 +571,10 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
           <div className="text-base font-bold text-amber-200">
             {card.nameZh || card.name}
             <span className="ml-2 text-xs font-normal text-zinc-400">
-              {card.tier}★{card.minionType ? ' · ' + (RACE_CN[card.minionType] ?? '') : ''}
+              {card.tier != null && card.tier > 0 ? `${card.tier}★` : ''}
+              {card.minionType
+                ? `${card.tier != null && card.tier > 0 ? ' · ' : ''}${RACE_CN[card.minionType] ?? ''}`
+                : ''}
             </span>
           </div>
           {card.textZh && (
