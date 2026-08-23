@@ -1,5 +1,9 @@
 name: Bgdb Update → Rebuild Cards Web
 
+# 说明：cards.json 由仓库内 raw_bg_cards.json 经 build-data.mjs 生成（含随从/法术/畸变/任务/饰品全类型）。
+# 上游 Release 的 web-cards.json 仅含随从，故不再在构建链中拉取覆盖；
+# 数据更新 = 从新版 BattlegroundDB.dll 重新导出 raw_bg_cards.json 并提交本仓库。
+
 on:
   repository_dispatch:
     types: [bgdb-updated]
