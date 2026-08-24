@@ -147,28 +147,39 @@ function CrownCircle() {
 
 function VoidCircle() {
   return (
-    <div className="h-full w-full rounded-full bg-gradient-to-b from-[#3a2f52] to-[#17101f]" />
+    <img
+      src="/img/special/BG34_HERO_004.png"
+      alt=""
+      className="h-full w-full rounded-full object-cover"
+      draggable={false}
+    />
   );
 }
 
-/* ═══════════ 新特殊类别圆形图标（渐变 + 符号，无专用图素材） ═══════════ */
-const EXTRA_GLYPH: Record<ExtraSpecial, { glyph: string; from: string; to: string }> = {
-  SPELLS: { glyph: '✦', from: '#6d3fd4', to: '#2b1a5e' },
-  ANOMALIES: { glyph: '◉', from: '#0e7490', to: '#134e4a' },
-  QUESTS: { glyph: '⚑', from: '#b45309', to: '#71330f' },
-  TRINKETS: { glyph: '◆', from: '#15803d', to: '#14532d' },
-  DARK_GIFTS: { glyph: '☾', from: '#4c1d95', to: '#17103a' },
-  HEROES: { glyph: '✪', from: '#1d4ed8', to: '#172554' },
+/* ═══════════ 新特殊类别圆形图标（真实图片） ═══════════ */
+const EXTRA_IMAGE: Record<ExtraSpecial, string> = {
+  SPELLS: '/img/special/spell.jpg',
+  ANOMALIES: '/img/special/anomaly.png',
+  QUESTS: '/img/special/BG24_HERO_100.png',
+  TRINKETS: '/img/special/BG30_HERO_304.png',
+  DARK_GIFTS: '/img/special/BG36_HERO_105.png',
+  HEROES: '/img/special/BG20_HERO_202.png',
+};
+const EXTRA_POS: Partial<Record<ExtraSpecial, string>> = {
+  DARK_GIFTS: 'translateX(4%)',
 };
 
 function GlyphCircle({ es }: { es: ExtraSpecial }) {
-  const g = EXTRA_GLYPH[es];
+  const pos = EXTRA_POS[es];
   return (
-    <div
-      className="flex h-full w-full items-center justify-center rounded-full text-[26px] leading-none text-[#ffe9a8]"
-      style={{ background: `linear-gradient(to bottom, ${g.from}, ${g.to})` }}
-    >
-      {g.glyph}
+    <div className="h-full w-full overflow-hidden rounded-full">
+      <img
+        src={EXTRA_IMAGE[es]}
+        alt=""
+        className="h-full w-full object-cover"
+        style={pos ? { transform: pos } : undefined}
+        draggable={false}
+      />
     </div>
   );
 }
