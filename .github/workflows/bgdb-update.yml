@@ -1,4 +1,8 @@
-﻿name: Bgdb Update 鈫?Rebuild Cards Web
+﻿name: Bgdb Update → Rebuild Cards Web
+
+# 说明：cards.json 由仓库内 raw_bg_cards.json 经 build-data.mjs 生成（含随从/法术/畸变/任务/饰品全类型）。
+# 数据来源：BattlegroundDB 仓库 main 分支的 BattlegroundDB/Data/bg_cards.json（全量数据）。
+# 上游 Release 的 web-cards.json 仅含随从，不适用于本项目。
 
 on:
   repository_dispatch:
@@ -13,6 +17,13 @@ jobs:
         with:
           ref: feature/card-browser
 
+      - name: Fetch latest BattlegroundDB data
+        run: |
+          curl -L -o HBTCards-Web/raw_bg_cards.json \
+            https://raw.githubusercontent.com/iceshoesss/BattlegroundDB/main/BattlegroundDB/Data/bg_cards.json
+          echo "Downloaded bg_cards.json:"
+          head -c 500 HBTCards-Web/raw_bg_cards.json
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -21,7 +32,7 @@ jobs:
       - name: Install deps
         run: cd HBTCards-Web && npm ci
 
-      - name: Build (fetch data + images + vite)
+      - name: Build (fetch images + vite)
         run: cd HBTCards-Web && npm run build
 
       - name: Deploy to Cloudflare Pages
