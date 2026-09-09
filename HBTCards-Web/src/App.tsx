@@ -335,7 +335,7 @@ function MobileFilterBar({
   const [showKeywords, setShowKeywords] = useState(false);
 
   return (
-    <div className="sticky top-0 z-30 border-b border-[#77572e]/60 bg-[#1a1410ee] px-2 py-2 backdrop-blur-sm">
+    <div className="panel-bg sticky top-0 z-30 border-b border-[#77572e]/60 px-2 py-2">
       {/* 种族筛选 */}
       <div className="scroll-chips">
         <button
@@ -548,57 +548,59 @@ export default function App() {
           selectSpecial={selectSpecial}
         />
 
-        <div className="p-2">
-          {/* 移动端标题 */}
-          <div className="py-2 text-center">
-            <div className="parchment inline-flex h-[30px] items-center justify-center rounded-md border border-[#8a7345] px-4 shadow-lg">
-              <span className="text-sm font-bold tracking-widest text-[#3a2c18]">
-                {meta ? meta.label.split('').join(' ') : '随 从'}
-              </span>
+        <div className="wood-frame mx-1 mt-1 rounded-[16px] border-2 border-[#241708] p-1">
+          <div className="felt-bg rounded-[14px] border border-[#668a6a3f] p-3">
+            {/* 移动端标题 */}
+            <div className="py-2 text-center">
+              <div className="parchment inline-flex h-[30px] items-center justify-center rounded-md border border-[#8a7345] px-4 shadow-lg">
+                <span className="text-sm font-bold tracking-widest text-[#3a2c18]">
+                  {meta ? meta.label.split('').join(' ') : '随 从'}
+                </span>
+              </div>
+              <div className="mt-1 text-[10px] text-[#d9c184]/55">
+                {countLabel}
+              </div>
             </div>
-            <div className="mt-1 text-[10px] text-[#d9c184]/55">
-              {countLabel}
-            </div>
-          </div>
 
-          {/* 移动端卡牌网格 */}
-          {!db ? (
-            <div className="py-24 text-center text-zinc-300/70">加载中…</div>
-          ) : total === 0 ? (
-            <div className="py-24 text-center text-zinc-300/60">
-              没有符合条件的{meta?.label ?? '卡牌'}
-            </div>
-          ) : (
-            <div className="flex flex-wrap justify-center pb-2">
-              {sections.map(s => (
-                <section key={`${s.kind}-${s.title}`}>
-                  {/* 移动端分组标题 */}
-                  <div className="my-2 text-center">
-                    <span className="inline-block rounded bg-[#45305c] px-3 py-0.5 text-xs font-bold text-[#e3cf9b]">
-                      {s.title} <span className="ml-1 font-normal opacity-60">{s.cards.length}</span>
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap justify-center">
-                    {s.cards.map(c =>
-                      s.kind === 'render' ? (
-                        <SpecialTile
-                          key={c.cardId}
-                          c={c}
-                          onSelect={() => setPreviewCard(c)}
-                        />
-                      ) : (
-                        <MinionCard
-                          key={c.cardId}
-                          c={c}
-                          onSelect={() => setPreviewCard(c)}
-                        />
-                      ),
-                    )}
-                  </div>
-                </section>
-              ))}
-            </div>
-          )}
+            {/* 移动端卡牌网格 */}
+            {!db ? (
+              <div className="py-24 text-center text-zinc-300/70">加载中…</div>
+            ) : total === 0 ? (
+              <div className="py-24 text-center text-zinc-300/60">
+                没有符合条件的{meta?.label ?? '卡牌'}
+              </div>
+            ) : (
+              <div className="flex flex-wrap justify-center pb-2">
+                {sections.map(s => (
+                  <section key={`${s.kind}-${s.title}`}>
+                    {/* 移动端分组标题 */}
+                    <div className="my-2 text-center">
+                      <span className="inline-block rounded bg-[#45305c] px-3 py-0.5 text-xs font-bold text-[#e3cf9b]">
+                        {s.title} <span className="ml-1 font-normal opacity-60">{s.cards.length}</span>
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap justify-center">
+                      {s.cards.map(c =>
+                        s.kind === 'render' ? (
+                          <SpecialTile
+                            key={c.cardId}
+                            c={c}
+                            onSelect={() => setPreviewCard(c)}
+                          />
+                        ) : (
+                          <MinionCard
+                            key={c.cardId}
+                            c={c}
+                            onSelect={() => setPreviewCard(c)}
+                          />
+                        ),
+                      )}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
