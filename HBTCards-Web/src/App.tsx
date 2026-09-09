@@ -783,7 +783,7 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="relative flex flex-col gap-3 rounded-xl border border-[#b08d4f]/70 bg-[#141008f2] p-4 shadow-[0_16px_60px_rgba(0,0,0,0.8)]"
+        className="card-modal-content relative flex flex-col gap-3 rounded-xl border border-[#b08d4f]/70 bg-[#141008f2] p-4 shadow-[0_16px_60px_rgba(0,0,0,0.8)]"
         onClick={e => e.stopPropagation()}
       >
         <button
@@ -794,7 +794,7 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
           ✕
         </button>
 
-        <div className="flex justify-center gap-3">
+        <div className="card-modal-images flex justify-center gap-3">
           {/* 非随从单位（法术/畸变/任务/饰品/黑暗之赐/英雄）无金色版本，只显示一张图片 */}
           {(card.cardType && card.cardType !== 'minion') ? (
             card.cardType === 'hero' ? (
@@ -828,7 +828,7 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
           )}
         </div>
 
-        <div className="min-w-[568px] border-t border-[#77572e]/50 pt-2.5">
+        <div className="card-modal-text min-w-[568px] border-t border-[#77572e]/50 pt-2.5">
           <div className="text-base font-bold text-amber-200">
             {card.nameZh || card.name}
             <span className="ml-2 text-xs font-normal text-zinc-400">
