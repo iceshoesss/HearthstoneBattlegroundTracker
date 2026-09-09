@@ -777,35 +777,35 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2 sm:p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
       onClick={onClose}
     >
       <div
-        className="card-modal-content relative flex max-h-[calc(100vh-16px)] w-full max-w-[640px] flex-col gap-3 overflow-y-auto rounded-xl border border-[#b08d4f]/70 bg-[#141008f2] p-3 shadow-[0_16px_60px_rgba(0,0,0,0.8)] sm:max-h-[calc(100vh-32px)] sm:p-4"
+        className="relative flex flex-col gap-3 rounded-xl border border-[#b08d4f]/70 bg-[#141008f2] p-4 shadow-[0_16px_60px_rgba(0,0,0,0.8)]"
         onClick={e => e.stopPropagation()}
       >
         <button
           onClick={onClose}
           title="关闭 (Esc)"
-          className="absolute -right-2 -top-2 z-10 h-8 w-8 cursor-pointer rounded-full border border-[#77572e] bg-[#261207] text-sm text-[#d9c184] transition-colors hover:border-[#ffd75e] hover:text-[#ffd75e] sm:-right-3 sm:-top-3"
+          className="absolute -right-3 -top-3 h-8 w-8 cursor-pointer rounded-full border border-[#77572e] bg-[#261207] text-sm text-[#d9c184] transition-colors hover:border-[#ffd75e] hover:text-[#ffd75e]"
         >
           ✕
         </button>
 
-        <div className="card-modal-images flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+        <div className="flex justify-center gap-3">
           {/* 非随从单位（法术/畸变/任务/饰品/黑暗之赐/英雄）无金色版本，只显示一张图片 */}
           {(card.cardType && card.cardType !== 'minion') ? (
             card.cardType === 'hero' ? (
               <img
                 src={HERO_URL(card.cardId)}
                 alt={card.nameZh}
-                className="w-full max-w-[280px] rounded-md bg-zinc-900/80 sm:w-[280px]"
+                className="w-[280px] rounded-md bg-zinc-900/80"
               />
             ) : (
               <img
                 src={RENDER_URL(card.cardId)}
                 alt={card.nameZh}
-                className="w-full max-w-[280px] rounded-md bg-zinc-900/80 sm:w-[280px]"
+                className="w-[280px] rounded-md bg-zinc-900/80"
               />
             )
           ) : (
@@ -813,20 +813,20 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
               <img
                 src={RENDER_URL(card.cardId)}
                 alt={card.nameZh}
-                className="w-full max-w-[280px] rounded-md bg-zinc-900/80 sm:w-[280px]"
+                className="w-[280px] rounded-md bg-zinc-900/80"
               />
               <img
                 key={card.goldenCardId}
                 src={RENDER_URL(card.goldenCardId + '_triple')}
                 alt=""
-                className="w-full max-w-[280px] rounded-md ring-1 ring-amber-400/50 bg-zinc-900/80 sm:w-[280px]"
+                className="w-[280px] rounded-md ring-1 ring-amber-400/50 bg-zinc-900/80"
                 onError={e => ((e.target as HTMLImageElement).style.display = 'none')}
               />
             </>
           )}
         </div>
 
-        <div className="card-modal-text min-w-0 border-t border-[#77572e]/50 pt-2.5">
+        <div className="min-w-[568px] border-t border-[#77572e]/50 pt-2.5">
           <div className="text-base font-bold text-amber-200">
             {card.nameZh || card.name}
             <span className="ml-2 text-xs font-normal text-zinc-400">
