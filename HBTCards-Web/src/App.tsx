@@ -216,9 +216,9 @@ function SpecialTile({ c, onSelect }: { c: CardData; onSelect: () => void }) {
       />
       {/* 英雄护甲盾徽（图源：HDT Resources/armor.png） */}
       {isHero && typeof c.armor === 'number' && (
-        <div className="absolute bottom-[4px] right-[4px] h-[104px] w-[104px] drop-shadow-md">
+        <div className="absolute bottom-[2px] right-[2px] h-[80px] w-[80px] drop-shadow-md">
           <img src="/img/heroes/armor.png" alt="" className="absolute inset-0 h-full w-full" />
-          <span className="absolute inset-0 z-10 flex items-center justify-center text-[30px] font-bold text-white [text-shadow:_0_1px_3px_rgb(0_0_0_/_90%)]">
+          <span className="absolute inset-0 z-10 flex items-center justify-center text-2xl font-bold text-white [text-shadow:_0_1px_3px_rgb(0_0_0_/_90%)]">
             {c.armor}
           </span>
         </div>
@@ -272,8 +272,8 @@ function MinionCard({ c, onSelect }: { c: CardData; onSelect: () => void }) {
       <img
         src={`/img/tiers/tier-${Math.max(1, Math.min(7, c.tier ?? 1))}.png`}
         alt=""
-        className="absolute z-30 drop-shadow-md"
-        style={{ top: 4, left: '50%', marginLeft: -26, width: 52 }}
+        className="absolute z-10 drop-shadow-md"
+        style={{ top: 8, left: '50%', marginLeft: -26, width: 52 }}
       />
       {/* 256 画布 */}
       <div className="absolute" style={{ bottom: 0, left: 2, width: 164, height: 164 }}>
