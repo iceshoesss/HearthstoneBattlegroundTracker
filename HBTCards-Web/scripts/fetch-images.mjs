@@ -46,13 +46,12 @@ async function worker() {
     }
 
     // 2. 下载整卡渲染图 (512x, png) - 所有类型
-    // 使用 bgs/latest/zhCN 路径，包含中文卡牌文本
-    const renderId = c.cardType === 'hero' ? c.cardId : c.cardId;
-    const renderFile = new URL(renderId + '.png', rendersDir);
+    // 普通版本
+    const renderFile = new URL(c.cardId + '.png', rendersDir);
     if (!existsSync(renderFile)) {
       try {
         const res = await fetch(
-          `https://art.hearthstonejson.com/v1/bgs/latest/zhCN/512x/${encodeURIComponent(renderId)}.png`,
+          `https://art.hearthstonejson.com/v1/bgs/latest/zhCN/512x/${encodeURIComponent(c.cardId)}.png`,
         );
         if (res.ok) {
           writeFileSync(renderFile, Buffer.from(await res.arrayBuffer()));
@@ -65,6 +64,28 @@ async function worker() {
       }
     } else {
       skipped++;
+    }
+
+    // 金色版本（仅随从有金色）
+    if (c.goldenCardId && (!c.cardType || c.cardType === 'minion')) {
+      const goldenFile = new URL(c.goldenCardId + '_triple.png', rendersDir);
+      if (!existsSync(goldenFile)) {
+        try {
+          const res = await fetch(
+            `https://art.hearthstonejson.com/v1/bgs/latest/zhCN/512x/${encodeURIComponent(c.goldenCardId + '_triple')}.png`,
+          );
+          if (res.ok) {
+            writeFileSync(goldenFile, Buffer.from(await res.arrayBuffer()));
+            downloaded++;
+          } else {
+            failed++;
+          }
+        } catch {
+          failed++;
+        }
+      } else {
+        skipped++;
+      }
     }
 
     // 3. 下载英雄头像 (256x, png) - 仅英雄
