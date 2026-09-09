@@ -320,7 +320,80 @@ function MinionCard({ c, onSelect }: { c: CardData; onSelect: () => void }) {
   );
 }
 
-/* ═══════════ 移动端：横向滚动过滤器条 ═══════════ */
+/* ═══════════ 移动端：分层筛选栏 ═══════════ */
+
+/** 移动端小圆形图标按钮 */
+function MobileCircleButton({
+  caption,
+  active,
+  onClick,
+  iconSrc,
+}: {
+  caption: string;
+  active: boolean;
+  onClick: () => void;
+  iconSrc: string;
+}) {
+  return (
+    <button onClick={onClick} className="relative flex-shrink-0 flex flex-col items-center w-[60px] cursor-pointer">
+      {/* 光晕 */}
+      <div
+        className={`absolute top-0 left-1/2 -translate-x-1/2 w-[52px] h-[52px] rounded-full transition-shadow ${
+          active ? 'bg-amber-400/15 shadow-[0_0_12px_rgba(255,215,94,0.9)]' : ''
+        }`}
+      />
+      {/* 外环 */}
+      <div
+        className={`relative w-[52px] h-[52px] rounded-full border-2 transition-colors ${
+          active ? 'border-[#ffd75e]' : 'border-[#6b5433]'
+        }`}
+      >
+        {/* 内容 */}
+        <div className="absolute inset-[5px] overflow-hidden rounded-full">
+          <img
+            src={iconSrc}
+            alt=""
+            className="h-full w-full object-cover"
+            draggable={false}
+          />
+        </div>
+      </div>
+      {/* 标签 */}
+      <span
+        className={`mt-0.5 text-[10px] leading-tight text-center ${
+          active ? 'text-[#ffd75e]' : 'text-[#d9c184]'
+        }`}
+      >
+        {caption}
+      </span>
+    </button>
+  );
+}
+
+/** 移动端特殊类别图标 */
+const MOBILE_SPECIAL_ICONS: Record<string, string> = {
+  BUDDY: '/img/tribes/buddy.jpg',
+  TIMEWARPED: '/img/special/BG34_HERO_004.png',
+  SPELLS: '/img/special/spell.jpg',
+  ANOMALIES: '/img/special/anomaly.png',
+  QUESTS: '/img/special/BG24_HERO_100.png',
+  TRINKETS: '/img/special/BG30_HERO_304.png',
+  DARK_GIFTS: '/img/special/BG36_HERO_105.png',
+  HEROES: '/img/special/BG20_HERO_202.png',
+};
+
+/** 移动端星级图标 */
+function MobileTierIcon({ tier }: { tier: number }) {
+  return (
+    <img
+      src={`/img/tiers/tier-${tier}.png`}
+      alt={`${tier}星`}
+      className="h-full w-full object-contain"
+      draggable={false}
+    />
+  );
+}
+
 function MobileFilterBar({
   filters,
   setFilters,
@@ -334,100 +407,116 @@ function MobileFilterBar({
 }) {
   const [showKeywords, setShowKeywords] = useState(false);
 
+  // 判断当前类别是否为随从类（需要种族、星级、关键词）
+  const isMinionType = !filters.special || filters.special === 'BUDDY' || filters.special === 'TIMEWARPED';
+  // 判断当前类别是否需要星级
+  const needTier = isMinionType || filters.special === 'SPELLS';
+  // 判断当前类别是否需要关键词
+  const needKeyword = isMinionType;
+
+  // 第一区域：类别选项
+  const categories: { key: Filters['special']; label: string; icon: string }[] = [
+    { key: null, label: '随从', icon: '/img/tribes/other.jpg' },
+    { key: 'BUDDY', label: '伙伴', icon: MOBILE_SPECIAL_ICONS.BUDDY },
+    { key: 'TIMEWARPED', label: '时空扭曲', icon: MOBILE_SPECIAL_ICONS.TIMEWARPED },
+    { key: 'SPELLS', label: '法术', icon: MOBILE_SPECIAL_ICONS.SPELLS },
+    { key: 'ANOMALIES', label: '畸变', icon: MOBILE_SPECIAL_ICONS.ANOMALIES },
+    { key: 'QUESTS', label: '任务', icon: MOBILE_SPECIAL_ICONS.QUESTS },
+    { key: 'TRINKETS', label: '饰品', icon: MOBILE_SPECIAL_ICONS.TRINKETS },
+    { key: 'DARK_GIFTS', label: '黑暗之赐', icon: MOBILE_SPECIAL_ICONS.DARK_GIFTS },
+    { key: 'HEROES', label: '英雄', icon: MOBILE_SPECIAL_ICONS.HEROES },
+  ];
+
   return (
     <div className="panel-bg sticky top-0 z-30 border-b border-[#77572e]/60 px-2 py-2">
-      {/* 种族筛选 */}
-      <div className="scroll-chips">
-        <button
-          className={`scroll-chip ${!filters.race ? 'active' : ''}`}
-          onClick={() => selectRace(null)}
-        >
-          全部种族
-        </button>
-        {RACE_ORDER.map(r => (
-          <button
-            key={r}
-            className={`scroll-chip ${filters.race === r ? 'active' : ''}`}
-            onClick={() => selectRace(r)}
-          >
-            {RACE_CN[r]}
-          </button>
+      {/* 第一区域：类别筛选（圆形图标） */}
+      <div className="scroll-chips pb-1">
+        {categories.map(cat => (
+          <MobileCircleButton
+            key={cat.label}
+            caption={cat.label}
+            active={filters.special === cat.key}
+            onClick={() => selectSpecial(cat.key)}
+            iconSrc={cat.icon}
+          />
         ))}
-        <button
-          className={`scroll-chip ${filters.race === 'NEUTRAL' ? 'active' : ''}`}
-          onClick={() => selectRace('NEUTRAL')}
-        >
-          中立
-        </button>
       </div>
 
-      {/* 特殊类别筛选 */}
-      <div className="scroll-chips mt-1.5">
-        {(
-          ['BUDDY', 'TIMEWARPED', 'SPELLS', 'ANOMALIES', 'QUESTS', 'TRINKETS', 'DARK_GIFTS', 'HEROES'] as Filters['special'][]
-        ).map(s => {
-          const label =
-            s === 'BUDDY'
-              ? '伙伴'
-              : s === 'TIMEWARPED'
-                ? '时空扭曲'
-                : EXTRA_META[s as ExtraSpecial]?.label ?? s;
-          return (
+      {/* 第二区域：种族筛选（仅随从类显示） */}
+      {isMinionType && (
+        <div className="scroll-chips mt-2 pb-1">
+          <button
+            className={`scroll-chip ${!filters.race ? 'active' : ''}`}
+            onClick={() => selectRace(null)}
+          >
+            全部种族
+          </button>
+          {RACE_ORDER.map(r => (
             <button
-              key={s}
-              className={`scroll-chip ${filters.special === s ? 'active' : ''}`}
-              onClick={() => selectSpecial(s)}
+              key={r}
+              className={`scroll-chip ${filters.race === r ? 'active' : ''}`}
+              onClick={() => selectRace(r)}
             >
-              {label}
+              {RACE_CN[r]}
             </button>
-          );
-        })}
-      </div>
-
-      {/* 等级筛选 */}
-      <div className="scroll-chips mt-1.5">
-        <button
-          className={`scroll-chip ${filters.tier === null ? 'active' : ''}`}
-          onClick={() => setFilters(f => ({ ...f, tier: null }))}
-        >
-          全
-        </button>
-        {[1, 2, 3, 4, 5, 6, 7].map(t => (
+          ))}
           <button
-            key={t}
-            className={`scroll-chip ${filters.tier === t ? 'active' : ''}`}
-            onClick={() => setFilters(f => ({ ...f, tier: f.tier === t ? null : t }))}
+            className={`scroll-chip ${filters.race === 'NEUTRAL' ? 'active' : ''}`}
+            onClick={() => selectRace('NEUTRAL')}
           >
-            {t}★
+            中立
           </button>
-        ))}
-      </div>
+        </div>
+      )}
 
-      {/* 关键词（可折叠） */}
-      <div className="mt-1.5">
-        <button
-          className="flex items-center gap-1 text-xs text-[#cbb98a] hover:text-[#ffd75e] transition-colors"
-          onClick={() => setShowKeywords(!showKeywords)}
-        >
-          <span className="text-[10px]">{showKeywords ? '▼' : '▶'}</span>
-          关键词
-        </button>
-        {showKeywords && (
-          <div className="scroll-chips mt-1">
-            {KEYWORD_FILTERS.map(k => (
-              <button
-                key={k.cn}
-                className={`scroll-chip ${filters.keyword === k.cn ? 'active' : ''}`}
-                onClick={() =>
-                  setFilters(f => ({ ...f, keyword: f.keyword === k.cn ? null : k.cn }))
-                }
-              >
-                {k.cn}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* 第三区域：星级筛选（随从/伙伴/时空扭曲/法术显示） */}
+      {needTier && (
+        <div className="scroll-chips mt-2 pb-1">
+          <button
+            className={`scroll-chip ${filters.tier === null ? 'active' : ''}`}
+            onClick={() => setFilters(f => ({ ...f, tier: null }))}
+          >
+            全
+          </button>
+          {[1, 2, 3, 4, 5, 6, 7].map(t => (
+            <button
+              key={t}
+              className={`scroll-chip ${filters.tier === t ? 'active' : ''}`}
+              onClick={() => setFilters(f => ({ ...f, tier: f.tier === t ? null : t }))}
+            >
+              {t}★
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 第四区域：关键词筛选（仅随从类显示） */}
+      {needKeyword && (
+        <div className="mt-2">
+          <button
+            className="flex items-center gap-1 text-xs text-[#cbb98a] hover:text-[#ffd75e] transition-colors"
+            onClick={() => setShowKeywords(!showKeywords)}
+          >
+            <span className="text-[10px]">{showKeywords ? '▼' : '▶'}</span>
+            关键词
+          </button>
+          {showKeywords && (
+            <div className="scroll-chips mt-1 pb-1">
+              {KEYWORD_FILTERS.map(k => (
+                <button
+                  key={k.cn}
+                  className={`scroll-chip ${filters.keyword === k.cn ? 'active' : ''}`}
+                  onClick={() =>
+                    setFilters(f => ({ ...f, keyword: f.keyword === k.cn ? null : k.cn }))
+                  }
+                >
+                  {k.cn}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
