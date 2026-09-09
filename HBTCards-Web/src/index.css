@@ -106,3 +106,80 @@ body {
     0 -1.5px #000,
     0 0 4px rgba(0, 0, 0, 0.9);
 }
+
+/* ═══════════ 移动端适配 ═══════════ */
+
+/* 横向滚动过滤器条 */
+.scroll-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 0;
+  scroll-snap-type: x proximity;
+}
+.scroll-chips::-webkit-scrollbar {
+  display: none;
+}
+.scroll-chip {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  font-size: 13px;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: 1px solid #77572e;
+  background: rgba(38, 18, 7, 0.7);
+  color: #cbb98a;
+}
+.scroll-chip:hover {
+  border-color: #ffe9a8;
+}
+.scroll-chip.active {
+  border-color: #ffd75e;
+  background: #4a3410;
+  color: #ffd75e;
+}
+
+/* 移动端随从卡缩放容器 */
+.minion-card-wrapper {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+.minion-card-scale {
+  --card-scale: 1;
+  transform: scale(var(--card-scale));
+  transform-origin: top center;
+}
+
+/* 移动端特殊卡缩放容器 */
+.special-tile-wrapper {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+/* 移动端弹窗适配 */
+@media (max-width: 639px) {
+  .card-modal-content {
+    width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+  .card-modal-images {
+    flex-direction: column;
+    align-items: center;
+  }
+  .card-modal-images img {
+    width: 100%;
+    max-width: 280px;
+  }
+  .card-modal-text {
+    min-width: 0 !important;
+  }
+}

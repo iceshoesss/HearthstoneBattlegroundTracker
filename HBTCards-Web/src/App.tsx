@@ -192,7 +192,7 @@ function SpecialTile({ c, onSelect }: { c: CardData; onSelect: () => void }) {
   if (failed)
     return (
       <div
-        className="mx-[5px] my-[5px] flex h-[315px] w-[315px] cursor-pointer items-center justify-center rounded-md border border-[#77572e]/60 bg-[#1a1410] p-4 text-center text-base leading-relaxed text-[#d9c184]"
+        className="mx-[5px] my-[5px] flex w-[min(315px,calc(50vw-36px))] aspect-square cursor-pointer items-center justify-center rounded-md border border-[#77572e]/60 bg-[#1a1410] p-4 text-center text-base leading-relaxed text-[#d9c184]"
         onClick={onSelect}
         title={c.nameZh}
       >
@@ -202,8 +202,7 @@ function SpecialTile({ c, onSelect }: { c: CardData; onSelect: () => void }) {
 
   return (
     <div
-      className="relative mx-[5px] my-[5px] cursor-pointer transition-transform hover:scale-[1.03]"
-      style={{ width: 315, height: 315 }}
+      className="relative mx-[5px] my-[5px] w-[min(315px,calc(50vw-36px))] aspect-square cursor-pointer transition-transform hover:scale-[1.03]"
       onClick={onSelect}
       title={c.nameZh}
     >
@@ -212,8 +211,6 @@ function SpecialTile({ c, onSelect }: { c: CardData; onSelect: () => void }) {
         alt={c.nameZh}
         loading="lazy"
         decoding="async"
-        width={315}
-        height={315}
         className="h-full w-full object-contain drop-shadow-lg"
         onError={() => setFailed(true)}
       />
@@ -318,6 +315,118 @@ function MinionCard({ c, onSelect }: { c: CardData; onSelect: () => void }) {
             {c.health}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════ 移动端：横向滚动过滤器条 ═══════════ */
+function MobileFilterBar({
+  filters,
+  setFilters,
+  selectRace,
+  selectSpecial,
+}: {
+  filters: Filters;
+  setFilters: React.Dispatch<React.SetStateAction<Filters>>;
+  selectRace: (race: string | null) => void;
+  selectSpecial: (special: Filters['special']) => void;
+}) {
+  const [showKeywords, setShowKeywords] = useState(false);
+
+  return (
+    <div className="sticky top-0 z-30 border-b border-[#77572e]/60 bg-[#1a1410ee] px-2 py-2 backdrop-blur-sm">
+      {/* 种族筛选 */}
+      <div className="scroll-chips">
+        <button
+          className={`scroll-chip ${!filters.race ? 'active' : ''}`}
+          onClick={() => selectRace(null)}
+        >
+          全部种族
+        </button>
+        {RACE_ORDER.map(r => (
+          <button
+            key={r}
+            className={`scroll-chip ${filters.race === r ? 'active' : ''}`}
+            onClick={() => selectRace(r)}
+          >
+            {RACE_CN[r]}
+          </button>
+        ))}
+        <button
+          className={`scroll-chip ${filters.race === 'NEUTRAL' ? 'active' : ''}`}
+          onClick={() => selectRace('NEUTRAL')}
+        >
+          中立
+        </button>
+      </div>
+
+      {/* 特殊类别筛选 */}
+      <div className="scroll-chips mt-1.5">
+        {(
+          ['BUDDY', 'TIMEWARPED', 'SPELLS', 'ANOMALIES', 'QUESTS', 'TRINKETS', 'DARK_GIFTS', 'HEROES'] as Filters['special'][]
+        ).map(s => {
+          const label =
+            s === 'BUDDY'
+              ? '伙伴'
+              : s === 'TIMEWARPED'
+                ? '时空扭曲'
+                : EXTRA_META[s as ExtraSpecial]?.label ?? s;
+          return (
+            <button
+              key={s}
+              className={`scroll-chip ${filters.special === s ? 'active' : ''}`}
+              onClick={() => selectSpecial(s)}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 等级筛选 */}
+      <div className="scroll-chips mt-1.5">
+        <button
+          className={`scroll-chip ${filters.tier === null ? 'active' : ''}`}
+          onClick={() => setFilters(f => ({ ...f, tier: null }))}
+        >
+          全
+        </button>
+        {[1, 2, 3, 4, 5, 6, 7].map(t => (
+          <button
+            key={t}
+            className={`scroll-chip ${filters.tier === t ? 'active' : ''}`}
+            onClick={() => setFilters(f => ({ ...f, tier: f.tier === t ? null : t }))}
+          >
+            {t}★
+          </button>
+        ))}
+      </div>
+
+      {/* 关键词（可折叠） */}
+      <div className="mt-1.5">
+        <button
+          className="flex items-center gap-1 text-xs text-[#cbb98a] hover:text-[#ffd75e] transition-colors"
+          onClick={() => setShowKeywords(!showKeywords)}
+        >
+          <span className="text-[10px]">{showKeywords ? '▼' : '▶'}</span>
+          关键词
+        </button>
+        {showKeywords && (
+          <div className="scroll-chips mt-1">
+            {KEYWORD_FILTERS.map(k => (
+              <button
+                key={k.cn}
+                className={`scroll-chip ${filters.keyword === k.cn ? 'active' : ''}`}
+                onClick={() =>
+                  setFilters(f => ({ ...f, keyword: f.keyword === k.cn ? null : k.cn }))
+                }
+              >
+                {k.cn}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -429,160 +538,223 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-screen items-start justify-center p-[14px]">
-      <div className="wood-frame w-full max-w-[1560px] rounded-[22px] border-2 border-[#241708] p-1 lg:h-[calc(100vh-28px)]">
-        <div className="h-full rounded-[20px] border border-[#668a6a3f] p-3">
-          <div className="grid h-full min-h-0 gap-y-4 lg:grid-cols-[216px_1fr_216px]">
+    <div className="min-h-screen">
+      {/* ═══════════ 移动端布局 ═══════════ */}
+      <div className="block lg:hidden">
+        <MobileFilterBar
+          filters={filters}
+          setFilters={setFilters}
+          selectRace={selectRace}
+          selectSpecial={selectSpecial}
+        />
 
-            {/* ───── 左：等级 + 关键词 ───── */}
-            <Panel>
-              <Banner label="等 级" />
-              {/* 法术模式下等级筛选可用；其余特殊类别下置灰（保留已选状态，返回随从模式恢复生效） */}
-              <div
-                aria-disabled={extraMode && filters.special !== 'SPELLS'}
-                className={`grid grid-cols-2 px-[14px] pt-2 transition-opacity ${
-                  extraMode && filters.special !== 'SPELLS' ? 'pointer-events-none opacity-40' : ''
-                }`}
-              >
-                {[1, 2, 3, 4, 5, 6, 7].map(t => (
-                  <TierButton
-                    key={t}
-                    tier={t}
-                    active={filters.tier === t}
-                    onClick={() =>
-                      setFilters(f => ({ ...f, tier: f.tier === t ? null : t }))
-                    }
-                  />
-                ))}
-              </div>
-              <Banner label="关 键 词" />
-              <div className="flex flex-wrap px-2.5 pb-3 pt-1.5">
-                {KEYWORD_FILTERS.map(k => (
-                  <KeywordChip
-                    key={k.cn}
-                    cn={k.cn}
-                    active={filters.keyword === k.cn}
-                    onClick={() =>
-                      setFilters(f => ({ ...f, keyword: f.keyword === k.cn ? null : k.cn }))
-                    }
-                  />
-                ))}
-              </div>
-            </Panel>
+        <div className="p-2">
+          {/* 移动端标题 */}
+          <div className="py-2 text-center">
+            <div className="parchment inline-flex h-[30px] items-center justify-center rounded-md border border-[#8a7345] px-4 shadow-lg">
+              <span className="text-sm font-bold tracking-widest text-[#3a2c18]">
+                {meta ? meta.label.split('').join(' ') : '随 从'}
+              </span>
+            </div>
+            <div className="mt-1 text-[10px] text-[#d9c184]/55">
+              {countLabel}
+            </div>
+          </div>
 
-            {/* ───── 中：随从列表 ───── */}
-            <main className="felt-bg relative mx-0 flex min-h-0 flex-col overflow-hidden rounded-[14px] border-2 border-[#20142e] lg:mx-0">
-              <div className="flex shrink-0 flex-col items-center pt-[10px]">
-                <div className="parchment flex h-[34px] w-[430px] max-w-[92%] items-center justify-center rounded-md border border-[#8a7345] shadow-lg">
-                  <span className="text-base font-bold tracking-widest text-[#3a2c18]">
-                    {meta ? meta.label.split('').join(' ') : '随 从'}
+          {/* 移动端卡牌网格 */}
+          {!db ? (
+            <div className="py-24 text-center text-zinc-300/70">加载中…</div>
+          ) : total === 0 ? (
+            <div className="py-24 text-center text-zinc-300/60">
+              没有符合条件的{meta?.label ?? '卡牌'}
+            </div>
+          ) : (
+            <div className="flex flex-wrap justify-center pb-2">
+              {sections.map(s => (
+                <section key={`${s.kind}-${s.title}`}>
+                  {/* 移动端分组标题 */}
+                  <div className="my-2 text-center">
+                    <span className="inline-block rounded bg-[#45305c] px-3 py-0.5 text-xs font-bold text-[#e3cf9b]">
+                      {s.title} <span className="ml-1 font-normal opacity-60">{s.cards.length}</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap justify-center">
+                    {s.cards.map(c =>
+                      s.kind === 'render' ? (
+                        <SpecialTile
+                          key={c.cardId}
+                          c={c}
+                          onSelect={() => setPreviewCard(c)}
+                        />
+                      ) : (
+                        <MinionCard
+                          key={c.cardId}
+                          c={c}
+                          onSelect={() => setPreviewCard(c)}
+                        />
+                      ),
+                    )}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ═══════════ 桌面端布局 ═══════════ */}
+      <div className="hidden lg:flex lg:min-h-screen lg:items-start lg:justify-center lg:p-[14px]">
+        <div className="wood-frame w-full max-w-[1560px] rounded-[22px] border-2 border-[#241708] p-1 lg:h-[calc(100vh-28px)]">
+          <div className="h-full rounded-[20px] border border-[#668a6a3f] p-3">
+            <div className="grid h-full min-h-0 gap-y-4 lg:grid-cols-[216px_1fr_216px]">
+
+              {/* ───── 左：等级 + 关键词 ───── */}
+              <Panel>
+                <Banner label="等 级" />
+                <div
+                  aria-disabled={extraMode && filters.special !== 'SPELLS'}
+                  className={`grid grid-cols-2 px-[14px] pt-2 transition-opacity ${
+                    extraMode && filters.special !== 'SPELLS' ? 'pointer-events-none opacity-40' : ''
+                  }`}
+                >
+                  {[1, 2, 3, 4, 5, 6, 7].map(t => (
+                    <TierButton
+                      key={t}
+                      tier={t}
+                      active={filters.tier === t}
+                      onClick={() =>
+                        setFilters(f => ({ ...f, tier: f.tier === t ? null : t }))
+                      }
+                    />
+                  ))}
+                </div>
+                <Banner label="关 键 词" />
+                <div className="flex flex-wrap px-2.5 pb-3 pt-1.5">
+                  {KEYWORD_FILTERS.map(k => (
+                    <KeywordChip
+                      key={k.cn}
+                      cn={k.cn}
+                      active={filters.keyword === k.cn}
+                      onClick={() =>
+                        setFilters(f => ({ ...f, keyword: f.keyword === k.cn ? null : k.cn }))
+                      }
+                    />
+                  ))}
+                </div>
+              </Panel>
+
+              {/* ───── 中：随从列表 ───── */}
+              <main className="felt-bg relative mx-0 flex min-h-0 flex-col overflow-hidden rounded-[14px] border-2 border-[#20142e] lg:mx-0">
+                <div className="flex shrink-0 flex-col items-center pt-[10px]">
+                  <div className="parchment flex h-[34px] w-[430px] max-w-[92%] items-center justify-center rounded-md border border-[#8a7345] shadow-lg">
+                    <span className="text-base font-bold tracking-widest text-[#3a2c18]">
+                      {meta ? meta.label.split('').join(' ') : '随 从'}
+                    </span>
+                  </div>
+                  <span className="mt-1 text-[11px] tracking-wide text-[#d9c184]/55">
+                    BattlegroundDB v{db?.version ?? '…'} · {countLabel}
                   </span>
                 </div>
-                <span className="mt-1 text-[11px] tracking-wide text-[#d9c184]/55">
-                  BattlegroundDB v{db?.version ?? '…'} · {countLabel}
-                </span>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1">
-                {!db ? (
-                  <div className="py-24 text-center text-zinc-300/70">加载中…</div>
-                ) : total === 0 ? (
-                  <div className="py-24 text-center text-zinc-300/60">
-                    没有符合条件的{meta?.label ?? '卡牌'}
-                  </div>
-                ) : (
-                  /* 按分段的 kind 渲染：minion=合成随从卡；render=整卡渲染图（时空扭曲为混合模式） */
-                  sections.map(s => (
-                    <section key={`${s.kind}-${s.title}`}>
-                      <SectionHeader title={s.title} count={s.cards.length} />
-                      <div className="flex flex-wrap justify-center pb-2">
-                        {s.cards.map(c =>
-                          s.kind === 'render' ? (
-                            <SpecialTile
-                              key={c.cardId}
-                              c={c}
-                              onSelect={() => setPreviewCard(c)}
-                            />
-                          ) : (
-                            <MinionCard
-                              key={c.cardId}
-                              c={c}
-                              onSelect={() => setPreviewCard(c)}
-                            />
-                          ),
-                        )}
-                      </div>
-                    </section>
-                  ))
-                )}
-              </div>
-            </main>
+                <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1">
+                  {!db ? (
+                    <div className="py-24 text-center text-zinc-300/70">加载中…</div>
+                  ) : total === 0 ? (
+                    <div className="py-24 text-center text-zinc-300/60">
+                      没有符合条件的{meta?.label ?? '卡牌'}
+                    </div>
+                  ) : (
+                    sections.map(s => (
+                      <section key={`${s.kind}-${s.title}`}>
+                        <SectionHeader title={s.title} count={s.cards.length} />
+                        <div className="flex flex-wrap justify-center pb-2">
+                          {s.cards.map(c =>
+                            s.kind === 'render' ? (
+                              <SpecialTile
+                                key={c.cardId}
+                                c={c}
+                                onSelect={() => setPreviewCard(c)}
+                              />
+                            ) : (
+                              <MinionCard
+                                key={c.cardId}
+                                c={c}
+                                onSelect={() => setPreviewCard(c)}
+                              />
+                            ),
+                          )}
+                        </div>
+                      </section>
+                    ))
+                  )}
+                </div>
+              </main>
 
-            {/* ───── 右：类型 + 特殊 ───── */}
-            <Panel>
-              <Banner label="类 型" />
-              {/* 特殊非随从类别下种族筛选不生效，置灰（保留已选状态） */}
-              <div
-                aria-disabled={extraMode}
-                className={`grid grid-cols-2 px-[14px] pt-2 transition-opacity ${
-                  extraMode ? 'pointer-events-none opacity-40' : ''
-                }`}
-              >
-                <CircleButton
-                  caption="全部种族"
-                  active={!filters.race}
-                  onClick={() => selectRace(null)}
+              {/* ───── 右：类型 + 特殊 ───── */}
+              <Panel>
+                <Banner label="类 型" />
+                <div
+                  aria-disabled={extraMode}
+                  className={`grid grid-cols-2 px-[14px] pt-2 transition-opacity ${
+                    extraMode ? 'pointer-events-none opacity-40' : ''
+                  }`}
                 >
-                  <CrownCircle />
-                </CircleButton>
-                {RACE_ORDER.map(r => (
                   <CircleButton
-                    key={r}
-                    caption={RACE_CN[r]}
-                    active={filters.race === r}
-                    onClick={() => selectRace(r)}
+                    caption="全部种族"
+                    active={!filters.race}
+                    onClick={() => selectRace(null)}
                   >
-                    <TribeCircle file={RACE_ICON[r]} />
+                    <CrownCircle />
                   </CircleButton>
-                ))}
-                <CircleButton
-                  caption="中立"
-                  active={filters.race === 'NEUTRAL'}
-                  onClick={() => selectRace('NEUTRAL')}
-                >
-                  <TribeCircle file="other.jpg" />
-                </CircleButton>
-              </div>
+                  {RACE_ORDER.map(r => (
+                    <CircleButton
+                      key={r}
+                      caption={RACE_CN[r]}
+                      active={filters.race === r}
+                      onClick={() => selectRace(r)}
+                    >
+                      <TribeCircle file={RACE_ICON[r]} />
+                    </CircleButton>
+                  ))}
+                  <CircleButton
+                    caption="中立"
+                    active={filters.race === 'NEUTRAL'}
+                    onClick={() => selectRace('NEUTRAL')}
+                  >
+                    <TribeCircle file="other.jpg" />
+                  </CircleButton>
+                </div>
 
-              <Banner label="特 殊" />
-              <div className="grid grid-cols-2 px-[14px] pt-2">
-                <CircleButton
-                  caption="伙伴"
-                  active={filters.special === 'BUDDY'}
-                  onClick={() => selectSpecial('BUDDY')}
-                >
-                  <TribeCircle file="buddy.jpg" />
-                </CircleButton>
-                <CircleButton
-                  caption="时空扭曲"
-                  active={filters.special === 'TIMEWARPED'}
-                  onClick={() => selectSpecial('TIMEWARPED')}
-                >
-                  <VoidCircle />
-                </CircleButton>
-                {(
-                  ['SPELLS', 'ANOMALIES', 'QUESTS', 'TRINKETS', 'DARK_GIFTS', 'HEROES'] as ExtraSpecial[]
-                ).map(es => (
+                <Banner label="特 殊" />
+                <div className="grid grid-cols-2 px-[14px] pt-2">
                   <CircleButton
-                    key={es}
-                    caption={EXTRA_META[es].label}
-                    active={filters.special === es}
-                    onClick={() => selectSpecial(es)}
+                    caption="伙伴"
+                    active={filters.special === 'BUDDY'}
+                    onClick={() => selectSpecial('BUDDY')}
                   >
-                    <GlyphCircle es={es} />
+                    <TribeCircle file="buddy.jpg" />
                   </CircleButton>
-                ))}
-              </div>
-            </Panel>
+                  <CircleButton
+                    caption="时空扭曲"
+                    active={filters.special === 'TIMEWARPED'}
+                    onClick={() => selectSpecial('TIMEWARPED')}
+                  >
+                    <VoidCircle />
+                  </CircleButton>
+                  {(
+                    ['SPELLS', 'ANOMALIES', 'QUESTS', 'TRINKETS', 'DARK_GIFTS', 'HEROES'] as ExtraSpecial[]
+                  ).map(es => (
+                    <CircleButton
+                      key={es}
+                      caption={EXTRA_META[es].label}
+                      active={filters.special === es}
+                      onClick={() => selectSpecial(es)}
+                    >
+                      <GlyphCircle es={es} />
+                    </CircleButton>
+                  ))}
+                </div>
+              </Panel>
+            </div>
           </div>
         </div>
       </div>
@@ -605,35 +777,35 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="relative flex flex-col gap-3 rounded-xl border border-[#b08d4f]/70 bg-[#141008f2] p-4 shadow-[0_16px_60px_rgba(0,0,0,0.8)]"
+        className="card-modal-content relative flex max-h-[calc(100vh-16px)] w-full max-w-[640px] flex-col gap-3 overflow-y-auto rounded-xl border border-[#b08d4f]/70 bg-[#141008f2] p-3 shadow-[0_16px_60px_rgba(0,0,0,0.8)] sm:max-h-[calc(100vh-32px)] sm:p-4"
         onClick={e => e.stopPropagation()}
       >
         <button
           onClick={onClose}
           title="关闭 (Esc)"
-          className="absolute -right-3 -top-3 h-8 w-8 cursor-pointer rounded-full border border-[#77572e] bg-[#261207] text-sm text-[#d9c184] transition-colors hover:border-[#ffd75e] hover:text-[#ffd75e]"
+          className="absolute -right-2 -top-2 z-10 h-8 w-8 cursor-pointer rounded-full border border-[#77572e] bg-[#261207] text-sm text-[#d9c184] transition-colors hover:border-[#ffd75e] hover:text-[#ffd75e] sm:-right-3 sm:-top-3"
         >
           ✕
         </button>
 
-        <div className="flex justify-center gap-3">
+        <div className="card-modal-images flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
           {/* 非随从单位（法术/畸变/任务/饰品/黑暗之赐/英雄）无金色版本，只显示一张图片 */}
           {(card.cardType && card.cardType !== 'minion') ? (
             card.cardType === 'hero' ? (
               <img
                 src={HERO_URL(card.cardId)}
                 alt={card.nameZh}
-                className="w-[280px] rounded-md bg-zinc-900/80"
+                className="w-full max-w-[280px] rounded-md bg-zinc-900/80 sm:w-[280px]"
               />
             ) : (
               <img
                 src={RENDER_URL(card.cardId)}
                 alt={card.nameZh}
-                className="w-[280px] rounded-md bg-zinc-900/80"
+                className="w-full max-w-[280px] rounded-md bg-zinc-900/80 sm:w-[280px]"
               />
             )
           ) : (
@@ -641,20 +813,20 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
               <img
                 src={RENDER_URL(card.cardId)}
                 alt={card.nameZh}
-                className="w-[280px] rounded-md bg-zinc-900/80"
+                className="w-full max-w-[280px] rounded-md bg-zinc-900/80 sm:w-[280px]"
               />
               <img
                 key={card.goldenCardId}
                 src={RENDER_URL(card.goldenCardId + '_triple')}
                 alt=""
-                className="w-[280px] rounded-md ring-1 ring-amber-400/50 bg-zinc-900/80"
+                className="w-full max-w-[280px] rounded-md ring-1 ring-amber-400/50 bg-zinc-900/80 sm:w-[280px]"
                 onError={e => ((e.target as HTMLImageElement).style.display = 'none')}
               />
             </>
           )}
         </div>
 
-        <div className="min-w-[568px] border-t border-[#77572e]/50 pt-2.5">
+        <div className="card-modal-text min-w-0 border-t border-[#77572e]/50 pt-2.5">
           <div className="text-base font-bold text-amber-200">
             {card.nameZh || card.name}
             <span className="ml-2 text-xs font-normal text-zinc-400">
