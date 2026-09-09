@@ -20,7 +20,7 @@ jobs:
       - name: Fetch latest BattlegroundDB data
         run: |
           curl -L -o HBTCards-Web/raw_bg_cards.json \
-            https://raw.githubusercontent.com/iceshoesss/BattlegroundDB/main/BattlegroundDB/Data/bg_cards.json
+            https://raw.githubusercontent.com/iceshoesss/BattlegroundDB/master/BattlegroundDB/Data/bg_cards.json
           echo "Downloaded bg_cards.json:"
           head -c 500 HBTCards-Web/raw_bg_cards.json
 
