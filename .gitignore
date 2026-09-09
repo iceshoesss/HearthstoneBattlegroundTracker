@@ -21,6 +21,10 @@ node_modules/
 dist/
 HBTCards-Web/raw_bg_cards.json
 
+# 构建时生成的图片（本地化 CDN 资源）
+HBTCards-Web/public/img/renders/
+HBTCards-Web/public/img/heroes-portrait/
+
 # 本地工具缓存
 .playwright-mcp/
 .vite/

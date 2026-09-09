@@ -9,15 +9,14 @@ import {
   RACE_ORDER,
 } from './core/cards';
 
-// 随从卡图：构建时已本地化到 /img/cards/（方案C），加载零外部依赖
+// 随从卡图：构建时已本地化到 /img/cards/
 const TILE_URL = (cardId: string) => `/img/cards/${encodeURIComponent(cardId)}.jpg`;
-// 大图预览：bgs 全卡渲染（与桌面版查询器同源）
-const RENDER_URL = (id: string) =>
-  `https://art.hearthstonejson.com/v1/bgs/latest/zhCN/512x/${encodeURIComponent(id)}.png`;
+// 整卡渲染图：构建时已本地化到 /img/renders/
+const RENDER_URL = (id: string) => `/img/renders/${encodeURIComponent(id)}.png`;
+// 覆盖层
 const OVERLAY = (name: string) => `/img/minions/${name}.png`;
-// 英雄带框头像：拱形边框已烘焙在图内（256x272 透明底），与 HDT 同源
-const HERO_URL = (cardId: string) =>
-  `https://art.hearthstonejson.com/v1/heroes/latest/256x/${encodeURIComponent(cardId)}.png`;
+// 英雄头像：构建时已本地化到 /img/heroes-portrait/
+const HERO_URL = (cardId: string) => `/img/heroes-portrait/${encodeURIComponent(cardId)}.png`;
 
 // 种族 → 图标（与桌面版一致：Beast 用 pet.jpg，中立用 other.jpg）
 const RACE_ICON: Record<string, string> = {
