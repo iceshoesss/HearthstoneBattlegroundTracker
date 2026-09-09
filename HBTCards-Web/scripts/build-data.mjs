@@ -1,11 +1,25 @@
 // 从 BattlegroundDB 导出的 raw_bg_cards.json 生成精简版 web 数据
 // 用法: node scripts/build-data.mjs   （需先存在 raw_bg_cards.json）
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 const raw = JSON.parse(readFileSync(new URL('../raw_bg_cards.json', import.meta.url), 'utf8'));
 
 // dbfId → cardId 全量表，用于解析金色版本 cardId
-const byDbfId = new Map(raw.cards.map(c => [c.id, c]));
+// 优先使用 cards.battlegrounds.json（HearthstoneJSON），覆盖更全
+const hsbgJsonPath = new URL('../../HBTCards/Data/cards.battlegrounds.json', import.meta.url);
+let getCardIdByDbfId;
+if (existsSync(hsbgJsonPath)) {
+  const hsbgCards = JSON.parse(readFileSync(hsbgJsonPath, 'utf8'));
+  const byDbfId = new Map(hsbgCards.filter(c => c.dbfId > 0).map(c => [c.dbfId, c]));
+  // HearthstoneJSON 使用 `id` 字段，需要适配
+  getCardIdByDbfId = (dbfId) => byDbfId.get(dbfId)?.id ?? null;
+  console.log(`使用 HearthstoneJSON 索引: ${byDbfId.size} 条`);
+} else {
+  const byDbfId = new Map(raw.cards.map(c => [c.id, c]));
+  // BattlegroundDB 使用 `cardId` 字段
+  getCardIdByDbfId = (dbfId) => byDbfId.get(dbfId)?.cardId ?? null;
+  console.log('使用 BattlegroundDB 索引（金色版本解析可能不完整）');
+}
 
 // 黑暗之赐：由选取法术 BG36_MidGameEffect_000 的 childIds 精确圈定
 // （不能用 cardId 前缀 _000t 匹配 —— 会混入黑暗之赐衍生出的二级 token，如 t28t/t29t）
@@ -16,7 +30,7 @@ const cards = raw.cards
   .filter(c => c.cardType === 'minion' && !c.isToken && !c.isDuosOnly)
   .map(c => ({
     cardId: c.cardId,
-    goldenCardId: c.dbfIdGold ? byDbfId.get(c.dbfIdGold)?.cardId ?? `${c.cardId}_G` : `${c.cardId}_G`,
+    goldenCardId: c.dbfIdGold ? getCardIdByDbfId(c.dbfIdGold) ?? `${c.cardId}_G` : `${c.cardId}_G`,
     name: (c.name || '').trim(),
     nameZh: (c.nameZh || '').trim(),
     textZh: c.textZh || '',
@@ -67,7 +81,7 @@ const others = raw.cards
     }
     return {
       cardId: c.cardId,
-      goldenCardId: c.dbfIdGold ? byDbfId.get(c.dbfIdGold)?.cardId ?? `${c.cardId}_G` : `${c.cardId}_G`,
+    goldenCardId: c.dbfIdGold ? getCardIdByDbfId(c.dbfIdGold) ?? `${c.cardId}_G` : `${c.cardId}_G`,
       name: (c.name || '').trim(),
       nameZh: (c.nameZh || '').trim(),
       textZh: c.textZh || '',
