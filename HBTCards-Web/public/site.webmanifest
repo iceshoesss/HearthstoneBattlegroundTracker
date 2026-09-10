@@ -1,0 +1,21 @@
+{
+  "name": "HBT 酒馆战棋图鉴",
+  "short_name": "酒馆图鉴",
+  "description": "炉石传说酒馆战棋随从图鉴，支持多维筛选、种族分组、金色预览",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#f5c518",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
