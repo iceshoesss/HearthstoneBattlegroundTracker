@@ -7,7 +7,7 @@ export interface CardData {
   nameZh: string;
   textZh: string;
   tier: number | null; // 随从星级 1~7；法术等级 1~7；无等级法术为 null
-  minionType: string; // Title Case（"Beast"…"All"；"" = 中立）
+  minionType: string; // Title Case（"Aberration"/"Beast"…"All"；"" = 中立）
   attack: number;
   health: number;
   keywords: string[];
@@ -83,6 +83,7 @@ export interface Filters {
 }
 
 export const RACE_ORDER = [
+  'Aberration',
   'Beast',
   'Demon',
   'Dragon',
@@ -96,6 +97,7 @@ export const RACE_ORDER = [
 ] as const;
 
 export const RACE_CN: Record<string, string> = {
+  Aberration: '畸变怪',
   Beast: '野兽',
   Demon: '恶魔',
   Dragon: '龙',

@@ -110,6 +110,7 @@ public class CardDatabaseService
     /// <summary>新格式种族名（Title Case）→ 中文名</summary>
     private static readonly Dictionary<string, string> RaceChinese = new()
     {
+        ["Aberration"] = "畸变怪",
         ["Mech"] = "机械",
         ["Demon"] = "恶魔",
         ["Dragon"] = "龙",

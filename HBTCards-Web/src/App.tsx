@@ -20,6 +20,7 @@ const HERO_URL = (cardId: string) => `/img/heroes-portrait/${encodeURIComponent(
 
 // 种族 → 图标（与桌面版一致：Beast 用 pet.jpg，中立用 other.jpg）
 const RACE_ICON: Record<string, string> = {
+  Aberration: 'aberration.png', // 克苏恩
   Beast: 'pet.jpg',
   Demon: 'demon.jpg',
   Dragon: 'dragon.jpg',

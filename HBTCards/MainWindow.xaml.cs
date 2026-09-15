@@ -17,11 +17,12 @@ public partial class MainWindow : Window
 {
     /// <summary>种族展示顺序（Title Case，与 BattlegroundDB 一致）</summary>
     private static readonly string[] RaceOrder =
-        { "Beast", "Demon", "Dragon", "Elemental", "Mech", "Murloc", "Naga", "Pirate", "Quilboar", "Undead" };
+        { "Aberration", "Beast", "Demon", "Dragon", "Elemental", "Mech", "Murloc", "Naga", "Pirate", "Quilboar", "Undead" };
 
-    /// <summary>种族 → 图标文件名（HDT 同款，Beast 即 pet.jpg）</summary>
+    /// <summary>种族 → 图标文件名（HDT 同款，Beast 即 pet.jpg；Aberration 用克苏恩）</summary>
     private static readonly Dictionary<string, string> TribeIcons = new()
     {
+        ["Aberration"] = "aberration.png",
         ["Beast"] = "pet.jpg",
         ["Demon"] = "demon.jpg",
         ["Dragon"] = "dragon.jpg",
