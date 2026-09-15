@@ -22,7 +22,7 @@ public partial class MainWindow : Window
     /// <summary>种族 → 图标文件名（HDT 同款，Beast 即 pet.jpg；Aberration 用克苏恩）</summary>
     private static readonly Dictionary<string, string> TribeIcons = new()
     {
-        ["Aberration"] = "aberration.png",
+        ["Aberration"] = "aberration.png", // 克苏恩英雄头像 TB_BaconShop_HERO_29
         ["Beast"] = "pet.jpg",
         ["Demon"] = "demon.jpg",
         ["Dragon"] = "dragon.jpg",
