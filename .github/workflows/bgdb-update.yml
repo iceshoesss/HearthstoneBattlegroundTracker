@@ -12,7 +12,7 @@ on:
   push:
     branches: [feature/card-browser]
     paths-ignore:
-      # 仅文档/无关文件变更时也部署一次无妨；这里不 ignore 代码，保证筛选 UI 能上线
+      # 仅文档/无关文件变更时不触发；空 commit 也会被 paths 过滤跳过
       - '**/*.md'
       - '.omo/**'
 
