@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/build-data.mjs && node scripts/fetch-images.mjs",
+    "fetch-raw": "node scripts/fetch-raw.mjs",
+    "prebuild": "node scripts/fetch-raw.mjs && node scripts/build-data.mjs && node scripts/fetch-images.mjs",
     "build": "vite build",
     "preview": "vite preview",
-    "update-data": "node scripts/build-data.mjs"
+    "update-data": "node scripts/fetch-raw.mjs && node scripts/build-data.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",

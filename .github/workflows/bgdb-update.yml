@@ -1,12 +1,20 @@
-name: Bgdb Update → Rebuild Cards Web
+name: Cards Web Build & Deploy
 
-# 说明：cards.json 由仓库内 raw_bg_cards.json 经 build-data.mjs 生成（含随从/法术/畸变/任务/饰品全类型）。
-# 数据来源：BattlegroundDB 仓库 main 分支的 BattlegroundDB/Data/bg_cards.json（全量数据）。
-# 上游 Release 的 web-cards.json 仅含随从，不适用于本项目。
+# 统一发布入口：repository_dispatch（BattlegroundDB 更新）与 push（代码/筛选改动）
+# 都先拉最新 bg_cards.json 再构建，避免 push 用仓库里过期的 public/data/cards.json 把站点版本冲回去。
+#
+# 数据来源：BattlegroundDB master 的 BattlegroundDB/Data/bg_cards.json（全量）。
+# raw_bg_cards.json 为 CI 临时文件（已 gitignore），不回写仓库。
 
 on:
   repository_dispatch:
     types: [bgdb-updated]
+  push:
+    branches: [feature/card-browser]
+    paths-ignore:
+      # 仅文档/无关文件变更时也部署一次无妨；这里不 ignore 代码，保证筛选 UI 能上线
+      - '**/*.md'
+      - '.omo/**'
 
 jobs:
   build-and-deploy:
@@ -15,24 +23,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: feature/card-browser
-
-      - name: Fetch latest BattlegroundDB data
-        run: |
-          curl -L -o HBTCards-Web/raw_bg_cards.json \
-            https://raw.githubusercontent.com/iceshoesss/BattlegroundDB/master/BattlegroundDB/Data/bg_cards.json
-          echo "Downloaded bg_cards.json:"
-          head -c 500 HBTCards-Web/raw_bg_cards.json
+          # dispatch：固定网页分支；push：用触发提交
+          ref: ${{ github.event_name == 'repository_dispatch' && 'feature/card-browser' || github.ref }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
+      - name: Fetch latest BattlegroundDB data
+        run: cd HBTCards-Web && node scripts/fetch-raw.mjs
+
       - name: Install deps
         run: cd HBTCards-Web && npm ci
 
-      - name: Build (fetch images + vite)
+      - name: Build (raw → cards.json + images + vite)
         run: cd HBTCards-Web && npm run build
 
       - name: Deploy to Cloudflare Pages
@@ -41,4 +46,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: HBTCards-Web
-          command: pages deploy dist --project-name=hbt-cards
+          command: pages deploy dist --project-name=hbt-cards --commit-dirty=true
