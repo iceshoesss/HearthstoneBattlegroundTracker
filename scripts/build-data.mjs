@@ -56,11 +56,14 @@ const cards = raw.cards
   .sort((a, b) => (a.tier - b.tier) || a.nameZh.localeCompare(b.nameZh, 'zh'));
 
 // 构建英雄技能 id → 技能数据 映射（用于给英雄附加 heroPower 信息）
-const heroPowerById = new Map(
-  raw.cards
-    .filter(c => c.cardType === 'hero_power' && !c.isToken)
-    .map(c => [c.id, c])
-);
+// 同时按 dbfId（BGDB id）与 cardId 建索引，兼容不同 childIds 形态
+const heroPowerById = new Map();
+const heroPowerByCardId = new Map();
+for (const c of raw.cards) {
+  if (c.cardType !== 'hero_power' || c.isToken) continue;
+  if (c.id != null) heroPowerById.set(c.id, c);
+  if (c.cardId) heroPowerByCardId.set(c.cardId, c);
+}
 
 // 非随从类型：法术 / 异变 / 任务 / 奖励 / 饰品 / 英雄（hero_power 不单独收录，仅附加到英雄）
 // 注：仅双人模式的异变（isDuosOnly）是有意保留的 —— 异变本身就是双人模式机制
@@ -68,12 +71,16 @@ const otherTypes = ['spell', 'anomaly', 'quest', 'reward', 'trinket', 'hero'];
 const others = raw.cards
   .filter(c => otherTypes.includes(c.cardType) && !c.isToken && c.pool !== false)
   .map(c => {
-    // 英雄：从 childIds 中提取 hero_power 技能信息
+    // 英雄：childIds → hero_power；再回退 cardId+'p' 约定
     let heroPower = null;
-    if (c.cardType === 'hero' && c.childIds) {
-      const hpId = c.childIds.find(id => heroPowerById.has(id));
-      if (hpId) {
-        const hp = heroPowerById.get(hpId);
+    if (c.cardType === 'hero') {
+      let hp = null;
+      if (c.childIds?.length) {
+        const hpId = c.childIds.find(id => heroPowerById.has(id) || heroPowerByCardId.has(id));
+        hp = hpId != null ? heroPowerById.get(hpId) ?? heroPowerByCardId.get(hpId) : null;
+      }
+      if (!hp && c.cardId) hp = heroPowerByCardId.get(`${c.cardId}p`) ?? null;
+      if (hp) {
         heroPower = {
           cardId: hp.cardId,
           name: (hp.name || '').trim(),

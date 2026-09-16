@@ -10,6 +10,7 @@
     "build:preview": "node scripts/build-data.mjs && node scripts/fetch-images.mjs && node scripts/fetch-patch-images.mjs && vite build",
     "build": "vite build",
     "preview": "vite preview",
+    "deploy:preview": "npm run build:preview && npx wrangler pages deploy dist --project-name=hbt-cards-preview",
     "update-data": "node scripts/generate-preview.mjs"
   },
   "dependencies": {

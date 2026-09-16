@@ -177,6 +177,70 @@ function zhOf(zhIndex, cardId, dbfId, enName, enText) {
   return { nameZh, textZh };
 }
 
+/** 用 HSJSON 补全补丁英雄的护甲与技能（patch 源通常不带这两项） */
+function enrichHeroesFromHsjson(cards, zhIndex) {
+  const byCardId = new Map(cards.filter(c => c.cardId).map(c => [c.cardId, c]));
+  const byId = new Map(cards.filter(c => c.id != null).map(c => [c.id, c]));
+  let armorFilled = 0;
+  let powerFilled = 0;
+
+  for (const hero of cards) {
+    if (hero.cardType !== 'hero' || hero.pool === false) continue;
+
+    const hs = zhIndex.byId.get(hero.cardId) || zhIndex.byDbf.get(hero.id);
+    if (!hs) continue;
+
+    if (hero.armor == null && hs.armor != null) {
+      hero.armor = hs.armor;
+      armorFilled++;
+    }
+
+    if (hero.childIds?.length) continue;
+
+    // 技能：heroPowerDbfId，或约定 cardId + 'p'
+    let power =
+      (hs.heroPowerDbfId != null && zhIndex.byDbf.get(hs.heroPowerDbfId)) ||
+      zhIndex.byId.get(`${hero.cardId}p`) ||
+      null;
+    if (!power?.id || power.type !== 'HERO_POWER') continue;
+
+    const powerDbfId = power.dbfId;
+    const zh = zhOf(zhIndex, power.id, powerDbfId, power.name, power.text || '');
+    let powerCard = byId.get(powerDbfId) || byCardId.get(power.id);
+    if (!powerCard) {
+      powerCard = {
+        id: powerDbfId,
+        cardId: power.id,
+        name: (power.name || '').trim(),
+        nameZh: zh.nameZh,
+        text: power.text || '',
+        textZh: zh.textZh,
+        cardType: 'hero_power',
+        manaCost: power.cost ?? null,
+        keywords: parseKeywords(power.text),
+        pool: true,
+        isToken: false,
+        isBuddy: false,
+        isDuosOnly: false,
+        isTimewarped: false,
+        childIds: [],
+        preview: true,
+        previewChangeType: hero.previewChangeType || 'added',
+      };
+      cards.push(powerCard);
+      byId.set(powerDbfId, powerCard);
+      byCardId.set(power.id, powerCard);
+    } else {
+      if (!powerCard.nameZh || powerCard.nameZh === powerCard.name) powerCard.nameZh = zh.nameZh;
+      if (!powerCard.textZh) powerCard.textZh = zh.textZh;
+    }
+    hero.childIds = [powerDbfId];
+    powerFilled++;
+  }
+
+  console.log(`英雄补全: 护甲 ${armorFilled}, 技能 ${powerFilled}`);
+}
+
 /** patch 条目 → raw 卡（BGDB 风格） */
 function patchCardToRaw(entry, dbfMap, changeType, zhIndex) {
   const dbfId = entry.id;
@@ -335,6 +399,7 @@ async function main() {
   const zhIndex = await loadZhIndex();
   const cards = rawDoc.cards.slice();
   const stats = applyPatch(cards, pdata, dbfMap, zhIndex);
+  enrichHeroesFromHsjson(cards, zhIndex);
   console.log('应用结果:', stats);
 
   // 构建期版本号标记为预览补丁
