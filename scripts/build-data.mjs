@@ -6,9 +6,13 @@ const raw = JSON.parse(readFileSync(new URL('../raw_bg_cards.json', import.meta.
 
 // dbfId → cardId 全量表，用于解析金色版本 cardId
 // 优先使用 cards.battlegrounds.json（HearthstoneJSON），覆盖更全
-const hsbgJsonPath = new URL('../../HBTCards/Data/cards.battlegrounds.json', import.meta.url);
+const hsbgCandidates = [
+  new URL('../data-src/cards.battlegrounds.json', import.meta.url),
+  new URL('../../HBTCards/Data/cards.battlegrounds.json', import.meta.url),
+];
+const hsbgJsonPath = hsbgCandidates.find(p => existsSync(p));
 let getCardIdByDbfId;
-if (existsSync(hsbgJsonPath)) {
+if (hsbgJsonPath) {
   const hsbgCards = JSON.parse(readFileSync(hsbgJsonPath, 'utf8'));
   const byDbfId = new Map(hsbgCards.filter(c => c.dbfId > 0).map(c => [c.dbfId, c]));
   // HearthstoneJSON 使用 `id` 字段，需要适配
@@ -27,7 +31,7 @@ const darkGiftParent = raw.cards.find(c => c.cardId === 'BG36_MidGameEffect_000'
 const darkGiftIds = new Set(darkGiftParent?.childIds ?? []);
 
 const cards = raw.cards
-  .filter(c => c.cardType === 'minion' && !c.isToken && !c.isDuosOnly)
+  .filter(c => c.cardType === 'minion' && !c.isToken && !c.isDuosOnly && c.pool !== false)
   .map(c => ({
     cardId: c.cardId,
     goldenCardId: c.dbfIdGold ? getCardIdByDbfId(c.dbfIdGold) ?? `${c.cardId}_G` : `${c.cardId}_G`,
@@ -47,6 +51,7 @@ const cards = raw.cards
     isTimewarped: !!c.isTimewarped,
     isDarkGift: false,
     dbfIdGold: c.dbfIdGold ?? null,
+    previewChangeType: c.previewChangeType ?? null,
   }))
   .sort((a, b) => (a.tier - b.tier) || a.nameZh.localeCompare(b.nameZh, 'zh'));
 
@@ -61,7 +66,7 @@ const heroPowerById = new Map(
 // 注：仅双人模式的异变（isDuosOnly）是有意保留的 —— 异变本身就是双人模式机制
 const otherTypes = ['spell', 'anomaly', 'quest', 'reward', 'trinket', 'hero'];
 const others = raw.cards
-  .filter(c => otherTypes.includes(c.cardType) && !c.isToken)
+  .filter(c => otherTypes.includes(c.cardType) && !c.isToken && c.pool !== false)
   .map(c => {
     // 英雄：从 childIds 中提取 hero_power 技能信息
     let heroPower = null;
@@ -99,6 +104,7 @@ const others = raw.cards
       isDarkGift: darkGiftIds.has(c.id),
       dbfIdGold: c.dbfIdGold ?? null,
       heroPower, // 英雄技能（仅英雄类型有值）
+      previewChangeType: c.previewChangeType ?? null,
     };
   });
 
@@ -118,6 +124,16 @@ const out = {
   count: all.length,
   cards: all,
 };
+
+// 预览元数据从 raw.meta 带出，避免 build:preview 再跑 build-data 时丢失
+if (raw.meta?.preview) {
+  out.preview = {
+    enabled: true,
+    patchVersion: raw.meta.patchVersion,
+    baseVersion: raw.meta.baseVersion,
+    summary: raw.meta.patchSummary,
+  };
+}
 
 writeFileSync(new URL('../public/data/cards.json', import.meta.url), JSON.stringify(out));
 

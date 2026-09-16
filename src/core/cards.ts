@@ -28,6 +28,8 @@ export interface CardData {
     manaCost: number | null;
     keywords: string[];
   } | null; // 英雄技能（仅英雄类型有值）
+  /** 预览站补丁变更标记：added / changed / returning */
+  previewChangeType?: 'added' | 'changed' | 'returning' | null;
 }
 
 export interface CardsDb {
@@ -35,6 +37,17 @@ export interface CardsDb {
   generatedAt: string;
   count: number;
   cards: CardData[];
+  preview?: {
+    enabled: boolean;
+    patchVersion: string;
+    baseVersion: string;
+    summary?: {
+      added?: number;
+      changed?: number;
+      removed?: number;
+      returning?: number;
+    };
+  };
 }
 
 export type CardType = NonNullable<CardData['cardType']>;

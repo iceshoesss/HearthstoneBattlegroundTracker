@@ -18,6 +18,45 @@ const OVERLAY = (name: string) => `/img/minions/${name}.png`;
 // 英雄头像：构建时已本地化到 /img/heroes-portrait/
 const HERO_URL = (cardId: string) => `/img/heroes-portrait/${encodeURIComponent(cardId)}.png`;
 
+/* ═══════════ 预览站：补丁变更徽章 ═══════════ */
+const PREVIEW_BADGE: Record<'added' | 'changed' | 'returning', { label: string; cls: string }> = {
+  added: { label: '新增', cls: 'bg-emerald-600/90 text-white' },
+  changed: { label: '调整', cls: 'bg-amber-500/90 text-[#1a1208]' },
+  returning: { label: '回归', cls: 'bg-sky-600/90 text-white' },
+};
+
+function PreviewBadge({ type }: { type: 'added' | 'changed' | 'returning' }) {
+  const b = PREVIEW_BADGE[type];
+  return (
+    <span
+      className={`pointer-events-none absolute left-1 top-1 z-20 rounded px-1 py-px text-[10px] font-bold leading-tight shadow ${b.cls}`}
+    >
+      {b.label}
+    </span>
+  );
+}
+
+function PreviewBanner({ preview }: { preview: NonNullable<CardsDb['preview']> }) {
+  const s = preview.summary ?? {};
+  const parts = [
+    s.added != null && `新增 ${s.added}`,
+    s.changed != null && `调整 ${s.changed}`,
+    s.removed != null && `移除 ${s.removed}`,
+    s.returning != null && `回归 ${s.returning}`,
+  ].filter(Boolean);
+  return (
+    <div className="mx-auto flex max-w-[92%] flex-wrap items-center justify-center gap-x-3 gap-y-0.5 rounded-md border border-[#8a7345]/70 bg-[#1a1408]/85 px-3 py-1.5 text-center text-[12px] text-[#e8d5a2] shadow">
+      <span className="font-bold tracking-wide text-[#ffd75e]">
+        补丁 {preview.patchVersion} 预览
+      </span>
+      {parts.length > 0 && (
+        <span className="opacity-80">{parts.join(' · ')}</span>
+      )}
+      <span className="text-[10px] opacity-55">数值可能调整，以正式上线为准</span>
+    </div>
+  );
+}
+
 // 种族 → 图标（与桌面版一致：Beast 用 pet.jpg，中立用 other.jpg）
 const RACE_ICON: Record<string, string> = {
   Aberration: 'aberration.jpg', // 克苏恩英雄肖像 TB_BaconShop_HERO_29（256x 无边框）
@@ -188,14 +227,16 @@ function GlyphCircle({ es }: { es: ExtraSpecial }) {
 function SpecialTile({ c, onSelect }: { c: CardData; onSelect: () => void }) {
   const [failed, setFailed] = useState(false);
   const isHero = c.cardType === 'hero';
+  const badge = c.previewChangeType;
 
   if (failed)
     return (
       <div
-        className="mx-[5px] my-[5px] flex w-[min(315px,calc(50vw-36px))] aspect-square cursor-pointer items-center justify-center rounded-md border border-[#77572e]/60 bg-[#1a1410] p-4 text-center text-base leading-relaxed text-[#d9c184]"
+        className="relative mx-[5px] my-[5px] flex w-[min(315px,calc(50vw-36px))] aspect-square cursor-pointer items-center justify-center rounded-md border border-[#77572e]/60 bg-[#1a1410] p-4 text-center text-base leading-relaxed text-[#d9c184]"
         onClick={onSelect}
         title={c.nameZh}
       >
+        {badge && <PreviewBadge type={badge} />}
         {c.nameZh || c.name}
       </div>
     );
@@ -206,6 +247,7 @@ function SpecialTile({ c, onSelect }: { c: CardData; onSelect: () => void }) {
       onClick={onSelect}
       title={c.nameZh}
     >
+      {badge && <PreviewBadge type={badge} />}
       <img
         src={isHero ? HERO_URL(c.cardId) : RENDER_URL(c.cardId)}
         alt={c.nameZh}
@@ -258,6 +300,9 @@ function SectionHeader({ title, count }: { title: string; count: number }) {
 /* ═══════════ 随从卡（256 画布等比缩放，坐标与桌面版完全一致） ═══════════ */
 function MinionCard({ c, onSelect }: { c: CardData; onSelect: () => void }) {
   const has = (k: string) => c.keywords.includes(k);
+  // 0=肖像, 1=补丁整卡渲染, 2=名称占位
+  const [portraitStage, setPortraitStage] = useState<0 | 1 | 2>(0);
+  const badge = c.previewChangeType;
   const overlay = (name: string) => (
     <img src={OVERLAY(name)} alt="" className="overlay-img" style={{ left: -24, top: -36, width: 300, height: 350 }} />
   );
@@ -268,6 +313,7 @@ function MinionCard({ c, onSelect }: { c: CardData; onSelect: () => void }) {
       style={{ width: 168, height: 200 }}
       onClick={onSelect}
     >
+      {badge && <PreviewBadge type={badge} />}
       {/* 星级盾徽（约 1/3 压在头像上） */}
       <img
         src={`/img/tiers/tier-${Math.max(1, Math.min(7, c.tier ?? 1))}.png`}
@@ -279,19 +325,34 @@ function MinionCard({ c, onSelect }: { c: CardData; onSelect: () => void }) {
       <div className="absolute" style={{ bottom: 0, left: 2, width: 164, height: 164 }}>
         <div className="canvas-256">
           {has('Taunt') && overlay('taunt')}
-          {/* 肖像：椭圆裁剪（Fill 拉伸与桌面 ImageBrush 行为一致） */}
-          <img
-            src={TILE_URL(c.cardId)}
-            alt={c.nameZh}
-            decoding="async"
-            className="absolute"
+          {/* 肖像：椭圆裁剪；缺图依次回退到补丁整卡渲染 → 名称占位 */}
+          <div
+            className="absolute overflow-hidden bg-[#1a1410]"
             style={{
               width: 256,
               height: 256,
-              objectFit: 'fill',
               clipPath: 'ellipse(87px 120px at 128px 128px)',
             }}
-          />
+          >
+            {portraitStage < 2 && (
+              <img
+                src={portraitStage === 0 ? TILE_URL(c.cardId) : RENDER_URL(c.cardId)}
+                alt={c.nameZh}
+                decoding="async"
+                onError={() => setPortraitStage(s => (s === 0 ? 1 : 2))}
+                className={
+                  portraitStage === 0
+                    ? 'absolute inset-0 h-full w-full object-fill'
+                    : 'absolute left-1/2 top-1/2 h-[92%] w-auto max-w-none -translate-x-1/2 -translate-y-[58%]'
+                }
+              />
+            )}
+            {portraitStage === 2 && (
+              <span className="absolute inset-0 flex items-center justify-center px-4 text-center text-[11px] leading-snug text-[#d9c184]">
+                {c.nameZh || c.name}
+              </span>
+            )}
+          </div>
           {overlay('border')}
           {has('Reborn') && overlay('reborn')}
           {has('Deathrattle') && overlay('deathrattle')}
@@ -649,6 +710,11 @@ export default function App() {
               <div className="mt-1 text-[10px] text-[#d9c184]/55">
                 {countLabel}
               </div>
+              {db?.preview?.enabled && (
+                <div className="mt-2">
+                  <PreviewBanner preview={db.preview} />
+                </div>
+              )}
             </div>
 
             {/* 移动端卡牌网格 */}
@@ -745,6 +811,11 @@ export default function App() {
                   <span className="mt-1 text-[11px] tracking-wide text-[#d9c184]/55">
                     BattlegroundDB v{db?.version ?? '…'} · {countLabel}
                   </span>
+                  {db?.preview?.enabled && (
+                    <div className="mt-1.5 w-full px-2">
+                      <PreviewBanner preview={db.preview} />
+                    </div>
+                  )}
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1">
                   {!db ? (
@@ -920,6 +991,15 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
         <div className="card-modal-text min-w-[568px] border-t border-[#77572e]/50 pt-2.5">
           <div className="text-base font-bold text-amber-200">
             {card.nameZh || card.name}
+            {card.previewChangeType && (
+              <span
+                className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                  PREVIEW_BADGE[card.previewChangeType].cls
+                }`}
+              >
+                {PREVIEW_BADGE[card.previewChangeType].label}
+              </span>
+            )}
             <span className="ml-2 text-xs font-normal text-zinc-400">
               {card.tier != null && card.tier > 0 ? `${card.tier}★` : ''}
               {card.minionType

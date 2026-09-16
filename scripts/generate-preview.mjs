@@ -101,13 +101,27 @@ function stripHtml(s) {
 /** 拉 hsbg 全量 cards，建 dbfId → externalId(cardId) */
 async function loadDbfToCardId() {
   const map = new Map();
-  // 本地 HearthstoneJSON 优先
+  // 本地 HearthstoneJSON 优先（战棋子集，可能过旧）
   if (existsSync(HSJSON_LOCAL)) {
     const list = JSON.parse(readFileSync(HSJSON_LOCAL, 'utf8'));
     for (const c of list) {
       if (c.dbfId > 0 && c.id) map.set(c.dbfId, c.id);
     }
     console.log(`dbf 映射(本地 HSJSON): ${map.size}`);
+  }
+  // 线上 HSJSON 全量覆盖/补齐（含最新 BG 卡正式 id，如 BG36_xxx）
+  try {
+    const live = await fetchJson('https://api.hearthstonejson.com/v1/latest/enUS/cards.json');
+    let liveAdded = 0;
+    for (const c of live) {
+      if (c.dbfId > 0 && c.id && !map.has(c.dbfId)) {
+        map.set(c.dbfId, c.id);
+        liveAdded++;
+      }
+    }
+    console.log(`dbf 映射(HSJSON 线上补齐): +${liveAdded} → ${map.size}`);
+  } catch (e) {
+    console.warn(`HSJSON 线上拉取失败: ${e.message}`);
   }
   // hsbg cards 分页补齐
   let offset = 0;
@@ -128,8 +142,43 @@ async function loadDbfToCardId() {
   return map;
 }
 
+/** HSJSON zhCN：cardId/dbfId → 中文名与描述 */
+async function loadZhIndex() {
+  const byId = new Map();
+  const byDbf = new Map();
+  const zhPath = path.join(root, 'data-src', 'cards.zhCN.json');
+  let list = null;
+  if (existsSync(zhPath)) {
+    list = JSON.parse(readFileSync(zhPath, 'utf8'));
+    console.log(`zhCN 索引(本地缓存): ${list.length}`);
+  } else {
+    list = await fetchJson('https://api.hearthstonejson.com/v1/latest/zhCN/cards.json');
+    try {
+      mkdirSync(path.dirname(zhPath), { recursive: true });
+      writeFileSync(zhPath, JSON.stringify(list));
+      console.log(`zhCN 索引(线上并缓存): ${list.length}`);
+    } catch {
+      console.log(`zhCN 索引(线上，未缓存): ${list.length}`);
+    }
+  }
+  for (const c of list) {
+    if (c.id) byId.set(c.id, c);
+    if (c.dbfId > 0) byDbf.set(c.dbfId, c);
+  }
+  return { byId, byDbf };
+}
+
+/** 取中文名/描述；HSJSON 无中文时回退英文 */
+function zhOf(zhIndex, cardId, dbfId, enName, enText) {
+  const c = (cardId && zhIndex.byId.get(cardId)) || (dbfId != null && zhIndex.byDbf.get(dbfId));
+  if (!c) return { nameZh: enName, textZh: enText };
+  const nameZh = (c.name || '').trim() || enName;
+  const textZh = c.text || enText || '';
+  return { nameZh, textZh };
+}
+
 /** patch 条目 → raw 卡（BGDB 风格） */
-function patchCardToRaw(entry, dbfMap, changeType) {
+function patchCardToRaw(entry, dbfMap, changeType, zhIndex) {
   const dbfId = entry.id;
   const card =
     changeType === 'removed' ? entry.oldCard || entry : entry.newCard || entry.oldCard;
@@ -145,14 +194,17 @@ function patchCardToRaw(entry, dbfMap, changeType) {
   const cardType = card.cardType || (minionTypes.length ? 'minion' : 'spell');
   const isHero = cardType === 'hero';
   const name = (card.name || entry.name || '').trim();
+  const zh = zhIndex
+    ? zhOf(zhIndex, cardId, dbfId, name, card.text || '')
+    : { nameZh: name, textZh: card.text || '' };
 
   return {
     id: dbfId,
     cardId,
     name,
-    nameZh: name, // 预览期暂无中文时用英文
+    nameZh: zh.nameZh,
     text: card.text || '',
-    textZh: card.text || '',
+    textZh: zh.textZh,
     tier: card.tier ?? null,
     cardType,
     minionType: minionTypes[0] || '',
@@ -185,7 +237,7 @@ function indexRaw(cards) {
   return { byCardId, byDbf };
 }
 
-function applyPatch(rawCards, patch, dbfMap) {
+function applyPatch(rawCards, patch, dbfMap, zhIndex) {
   const stats = { added: 0, changed: 0, removed: 0, returning: 0, skipped: 0 };
   const { byCardId, byDbf } = indexRaw(rawCards);
 
@@ -208,22 +260,22 @@ function applyPatch(rawCards, patch, dbfMap) {
     const t = sec.changeType;
     for (const entry of sec.cards || []) {
       if (t === 'added') {
-        upsert(patchCardToRaw(entry, dbfMap, 'added'));
+        upsert(patchCardToRaw(entry, dbfMap, 'added', zhIndex));
         stats.added++;
       } else if (t === 'returning') {
-        upsert(patchCardToRaw(entry, dbfMap, 'returning'));
+        upsert(patchCardToRaw(entry, dbfMap, 'returning', zhIndex));
         stats.returning++;
       } else if (t === 'changed') {
-        const raw = patchCardToRaw(entry, dbfMap, 'changed');
+        const raw = patchCardToRaw(entry, dbfMap, 'changed', zhIndex);
         if (raw) {
-          // 尽量保留原 cardId / 中文名
+          // 尽量保留原 cardId；中文优先 HSJSON，其次原库
           const existing = byDbf.get(raw.id) || byCardId.get(raw.cardId);
           if (existing) {
             raw.cardId = existing.cardId;
-            if (existing.nameZh) raw.nameZh = existing.nameZh;
-            if (existing.textZh && raw.previewChangeType === 'changed') {
-              // 英文 text 已是新文案；中文可能仍是旧的，保留字段但可被覆盖
+            if (!raw.nameZh || raw.nameZh === raw.name) {
+              if (existing.nameZh) raw.nameZh = existing.nameZh;
             }
+            if (!raw.textZh && existing.textZh) raw.textZh = existing.textZh;
             upsert(raw);
           } else {
             upsert(raw);
@@ -240,7 +292,7 @@ function applyPatch(rawCards, patch, dbfMap) {
           stats.removed++;
         } else {
           // 仍写入一条 removed 供 UI 过滤，但 pool=false
-          const raw = patchCardToRaw(entry, dbfMap, 'removed');
+          const raw = patchCardToRaw(entry, dbfMap, 'removed', zhIndex);
           if (raw) {
             raw.pool = false;
             rawCards.push(raw);
@@ -280,8 +332,9 @@ async function main() {
   );
 
   const dbfMap = await loadDbfToCardId();
+  const zhIndex = await loadZhIndex();
   const cards = rawDoc.cards.slice();
-  const stats = applyPatch(cards, pdata, dbfMap);
+  const stats = applyPatch(cards, pdata, dbfMap, zhIndex);
   console.log('应用结果:', stats);
 
   // 构建期版本号标记为预览补丁

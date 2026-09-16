@@ -1,0 +1,23 @@
+# Node / Web
+node_modules/
+dist/
+.vite/
+
+# Preview pipeline intermediate
+raw_bg_cards.json
+data-src/cards.zhCN.json
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temp
+*.tmp
+*.log
+.wrangler/

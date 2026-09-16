@@ -5,6 +5,8 @@
 Cloudflare Pages。**不接入主站自动流水线。**
 
 > 主站仍使用 `feature/card-browser` + `bgdb-update.yml`（正式数据）。
+>
+> 当前补丁：**36.6.1**（hsbg 路径参数用 `36.6.1`，不是 `36.6`）。
 
 ---
 
@@ -32,7 +34,7 @@ git checkout -b preview/36.8   # 换成目标补丁号
 npm run generate-preview
 
 # 或指定补丁
-node scripts/generate-preview.mjs 36.6
+node scripts/generate-preview.mjs 36.6.1
 ```
 
 脚本会：
@@ -41,7 +43,7 @@ node scripts/generate-preview.mjs 36.6
 2. 拉 `https://hsbg.cards/api/v1/patches/{ver}`
 3. 拉 hsbg cards API 做 dbfId → `externalId` 映射
 4. 应用 **added / changed / removed / returning**
-5. 写出 `raw_bg_cards.json`（版本号形如 `36.6-preview`）
+5. 写出 `raw_bg_cards.json`（版本号形如 `36.6.1-preview`）
 6. 跑 `build-data.mjs` → `public/data/cards.json`（附 `preview` 元数据）
 
 ### 3. 本地构建
@@ -51,6 +53,9 @@ npm ci
 npm run build:preview
 # 产物: dist/
 ```
+
+`build:preview` 会额外跑 `fetch-patch-images.mjs`，把补丁站整卡渲染落到
+`public/img/renders/PREVIEW_*.png`（含金色）。
 
 本地预览：
 
@@ -82,17 +87,18 @@ npx wrangler pages deploy dist --project-name=hbt-cards-preview
 | 补丁 | hsbg `/api/v1/patches/{ver}` 分区 diff |
 | `changed` | 用 `newCard` 覆盖，并标 `previewChangeType=changed` |
 | `removed` | `pool=false`，构建时会被过滤出正式池展示 |
-| 中文名 | 补丁源多为英文，`nameZh` 暂回退英文名 |
+| 中文名 | 从 HSJSON `zhCN/cards.json` 按 cardId/dbfId 回填；HSJSON 无中文时回退英文名 |
 | 数值 | 预览卡可能带 `preview:true`，上线后可能调整 |
+| 新卡图 | `PREVIEW_*` ID 时 HSJSON 暂无 256x 肖像；已从 hsbg 补丁站下载整卡渲染到 `public/img/renders/`，随从卡缺肖像时自动回退展示整卡 |
 
 在 `raw_bg_cards.json` / `cards.json` 的 meta 上可看到：
 
 ```json
 "preview": {
   "enabled": true,
-  "patchVersion": "36.6",
-  "baseVersion": "36.6",
-  "summary": { "added": 60, "changed": 9, "removed": 68, "returning": 30 }
+  "patchVersion": "36.6.1",
+  "baseVersion": "36.6.1",
+  "summary": { "added": 82, "changed": 9, "removed": 68, "returning": 30 }
 }
 ```
 

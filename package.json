@@ -7,7 +7,7 @@
     "dev": "vite",
     "generate-preview": "node scripts/generate-preview.mjs",
     "fetch-raw": "node scripts/fetch-raw.mjs",
-    "build:preview": "node scripts/build-data.mjs && node scripts/fetch-images.mjs && vite build",
+    "build:preview": "node scripts/build-data.mjs && node scripts/fetch-images.mjs && node scripts/fetch-patch-images.mjs && vite build",
     "build": "vite build",
     "preview": "vite preview",
     "update-data": "node scripts/generate-preview.mjs"
@@ -22,7 +22,7 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.5.2",
     "tailwindcss": "^4.1.8",
-    "typescript": "~5.8.8",
+    "typescript": "~5.8.3",
     "vite": "^6.3.5"
   }
 }
