@@ -1,0 +1,28 @@
+{
+  "name": "hbt-cards-preview",
+  "private": true,
+  "version": "0.1.0-preview",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "generate-preview": "node scripts/generate-preview.mjs",
+    "fetch-raw": "node scripts/fetch-raw.mjs",
+    "build:preview": "node scripts/build-data.mjs && node scripts/fetch-images.mjs && vite build",
+    "build": "vite build",
+    "preview": "vite preview",
+    "update-data": "node scripts/generate-preview.mjs"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.8",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.5.2",
+    "tailwindcss": "^4.1.8",
+    "typescript": "~5.8.8",
+    "vite": "^6.3.5"
+  }
+}
