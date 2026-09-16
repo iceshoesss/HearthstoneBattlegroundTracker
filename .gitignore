@@ -21,3 +21,7 @@ Thumbs.db
 *.tmp
 *.log
 .wrangler/
+
+# Cloudflare domain verification (local only, deploy via public/)
+d9a3c7bc415b89355b3bc151d147ce56.txt
+public/d9a3c7bc415b89355b3bc151d147ce56.txt
