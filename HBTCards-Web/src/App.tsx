@@ -5,6 +5,7 @@ import {
   EXTRA_META,
   isExtraSpecial,
   KEYWORD_FILTERS,
+  racesOf,
   RACE_CN,
   RACE_ORDER,
 } from './core/cards';
@@ -409,6 +410,8 @@ function MobileFilterBar({
 
   // 判断当前类别是否为随从类（需要种族、星级、关键词）
   const isMinionType = !filters.special || filters.special === 'BUDDY' || filters.special === 'TIMEWARPED';
+  // 种族筛选：随从类 + 饰品
+  const needRace = isMinionType || filters.special === 'TRINKETS';
   // 判断当前类别是否需要星级
   const needTier = isMinionType || filters.special === 'SPELLS';
   // 判断当前类别是否需要关键词
@@ -442,8 +445,8 @@ function MobileFilterBar({
         ))}
       </div>
 
-      {/* 第二区域：种族筛选（仅随从类显示） */}
-      {isMinionType && (
+      {/* 第二区域：种族筛选（随从类 / 饰品显示） */}
+      {needRace && (
         <div className="scroll-chips mt-2 pb-1">
           <button
             className={`scroll-chip ${!filters.race ? 'active' : ''}`}
@@ -783,37 +786,43 @@ export default function App() {
               {/* ───── 右：类型 + 特殊 ───── */}
               <Panel>
                 <Banner label="类 型" />
-                <div
-                  aria-disabled={extraMode}
-                  className={`grid grid-cols-2 px-[14px] pt-2 transition-opacity ${
-                    extraMode ? 'pointer-events-none opacity-40' : ''
-                  }`}
-                >
-                  <CircleButton
-                    caption="全部种族"
-                    active={!filters.race}
-                    onClick={() => selectRace(null)}
-                  >
-                    <CrownCircle />
-                  </CircleButton>
-                  {RACE_ORDER.map(r => (
-                    <CircleButton
-                      key={r}
-                      caption={RACE_CN[r]}
-                      active={filters.race === r}
-                      onClick={() => selectRace(r)}
+                {(() => {
+                  // 种族筛选：常规随从模式 + 饰品模式可用；其余特殊类别禁用
+                  const raceDisabled = extraMode && filters.special !== 'TRINKETS';
+                  return (
+                    <div
+                      aria-disabled={raceDisabled}
+                      className={`grid grid-cols-2 px-[14px] pt-2 transition-opacity ${
+                        raceDisabled ? 'pointer-events-none opacity-40' : ''
+                      }`}
                     >
-                      <TribeCircle file={RACE_ICON[r]} />
-                    </CircleButton>
-                  ))}
-                  <CircleButton
-                    caption="中立"
-                    active={filters.race === 'NEUTRAL'}
-                    onClick={() => selectRace('NEUTRAL')}
-                  >
-                    <TribeCircle file="other.jpg" />
-                  </CircleButton>
-                </div>
+                      <CircleButton
+                        caption="全部种族"
+                        active={!filters.race}
+                        onClick={() => selectRace(null)}
+                      >
+                        <CrownCircle />
+                      </CircleButton>
+                      {RACE_ORDER.map(r => (
+                        <CircleButton
+                          key={r}
+                          caption={RACE_CN[r]}
+                          active={filters.race === r}
+                          onClick={() => selectRace(r)}
+                        >
+                          <TribeCircle file={RACE_ICON[r]} />
+                        </CircleButton>
+                      ))}
+                      <CircleButton
+                        caption="中立"
+                        active={filters.race === 'NEUTRAL'}
+                        onClick={() => selectRace('NEUTRAL')}
+                      >
+                        <TribeCircle file="other.jpg" />
+                      </CircleButton>
+                    </div>
+                  );
+                })()}
 
                 <Banner label="特 殊" />
                 <div className="grid grid-cols-2 px-[14px] pt-2">
@@ -922,9 +931,12 @@ function CardModal({ card, onClose }: { card: CardData; onClose: () => void }) {
             {card.nameZh || card.name}
             <span className="ml-2 text-xs font-normal text-zinc-400">
               {card.tier != null && card.tier > 0 ? `${card.tier}★` : ''}
-              {card.minionType
-                ? `${card.tier != null && card.tier > 0 ? ' · ' : ''}${RACE_CN[card.minionType] ?? ''}`
-                : ''}
+              {(() => {
+                const races = racesOf(card);
+                if (races.length === 0) return '';
+                const label = races.map(r => RACE_CN[r] ?? r).join('/');
+                return `${card.tier != null && card.tier > 0 ? ' · ' : ''}${label}`;
+              })()}
               {card.armor != null && card.armor > 0 ? ` · 护甲 ${card.armor}` : ''}
             </span>
           </div>

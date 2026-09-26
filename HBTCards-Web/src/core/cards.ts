@@ -8,6 +8,7 @@ export interface CardData {
   textZh: string;
   tier: number | null; // 随从星级 1~7；法术等级 1~7；无等级法术为 null
   minionType: string; // Title Case（"Aberration"/"Beast"…"All"；"" = 中立）
+  minionTypes?: string[]; // 多种族（饰品支持；与 minionType 同为 Title Case）
   attack: number;
   health: number;
   keywords: string[];
@@ -132,6 +133,20 @@ export function raceName(raw: string): string {
   return RACE_CN[raw] ?? raw;
 }
 
+/** 卡牌关联种族列表（多种族饰品返回全部；无种族返回空数组） */
+export function racesOf(c: CardData): string[] {
+  if (c.minionTypes && c.minionTypes.length > 0) return c.minionTypes;
+  return c.minionType ? [c.minionType] : [];
+}
+
+/** 种族筛选命中（NEUTRAL=无种族；指定种族=命中任意一个） */
+export function matchesRace(c: CardData, race: string | null): boolean {
+  if (!race) return true;
+  const races = racesOf(c);
+  if (race === 'NEUTRAL') return races.length === 0;
+  return races.includes(race);
+}
+
 export interface Section {
   title: string;
   order: number;
@@ -195,8 +210,9 @@ function applyExtraSpecial(db: CardsDb, f: Filters): Section[] {
     sub = sub.filter(c => ens.some(en => c.keywords.includes(en)));
   }
 
-  // 等级筛选仅对法术生效；种族筛选对特殊类别不生效
+  // 等级筛选仅对法术生效；种族筛选仅对饰品生效（多种族命中任意一个）
   if (f.special === 'SPELLS' && f.tier != null) sub = sub.filter(c => c.tier === f.tier);
+  if (f.special === 'TRINKETS') sub = sub.filter(c => matchesRace(c, f.race));
 
   switch (f.special) {
     case 'SPELLS':
@@ -252,8 +268,7 @@ function applyTimewarped(db: CardsDb, f: Filters): Section[] {
   const ens = keywordEns(f);
 
   let minions = db.cards.filter(c => c.isTimewarped && typeOf(c) === 'minion');
-  if (f.race === 'NEUTRAL') minions = minions.filter(c => !c.minionType);
-  else if (f.race) minions = minions.filter(c => c.minionType === f.race);
+  minions = minions.filter(c => matchesRace(c, f.race));
   if (f.tier != null) minions = minions.filter(c => c.tier === f.tier);
   if (ens) minions = minions.filter(c => ens.some(en => c.keywords.includes(en)));
 
@@ -280,8 +295,7 @@ export function applyFilters(db: CardsDb, f: Filters): Section[] {
   }
 
   // 种族筛选对所有模式生效（含伙伴）
-  if (f.race === 'NEUTRAL') list = list.filter(c => !c.minionType);
-  else if (f.race) list = list.filter(c => c.minionType === f.race);
+  list = list.filter(c => matchesRace(c, f.race));
 
   if (f.tier != null) list = list.filter(c => c.tier === f.tier);
 

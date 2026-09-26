@@ -40,6 +40,7 @@ const cards = raw.cards
     trinketTier: null,
     armor: null,
     minionType: c.minionType ?? '',
+    minionTypes: (c.minionTypes ?? []).map(t => (t || '').trim()).filter(Boolean),
     attack: c.attack ?? 0,
     health: c.health ?? 0,
     keywords: c.keywords ?? [],
@@ -79,6 +80,15 @@ const others = raw.cards
         };
       }
     }
+    // 饰品种族：hsbg.cards 已带 minionType / minionTypes，需透传（其余非随从类型无种族）
+    const isTrinket = c.cardType === 'trinket';
+    const trinketRaces = isTrinket
+      ? (c.minionTypes ?? []).map(t => (t || '').trim()).filter(Boolean)
+      : [];
+    const trinketPrimary = isTrinket
+      ? ((c.minionType || '').trim() || trinketRaces[0] || '')
+      : '';
+
     return {
       cardId: c.cardId,
     goldenCardId: c.dbfIdGold ? getCardIdByDbfId(c.dbfIdGold) ?? `${c.cardId}_G` : `${c.cardId}_G`,
@@ -90,7 +100,8 @@ const others = raw.cards
       manaCost: c.manaCost ?? null,
       trinketTier: c.trinketTier ?? null,
       armor: c.armor ?? null, // 英雄护甲值
-      minionType: '',
+      minionType: trinketPrimary,
+      minionTypes: trinketRaces,
       attack: 0,
       health: 0,
       keywords: c.keywords ?? [],
