@@ -1,6 +1,7 @@
 # Build results
 **/bin/
 **/obj/
+packages/
 
 # IDE
 .vs/
@@ -12,6 +13,14 @@
 Thumbs.db
 .DS_Store
 
-# Temp files
+# Temp / logs
 *.tmp
 *.log
+build_output.txt
+*_crash.log
+
+# Web (belongs to feature/card-browser)
+node_modules/
+dist/
+.wrangler/
+HBTCards-Web/

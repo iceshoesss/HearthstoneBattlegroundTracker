@@ -16,7 +16,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
-    <DefaultItemExcludes>$(DefaultItemExcludes);BattlegroundSpy\**;BattlegroundSpy.Test\**;HBTCombat\**;HBTCombat.Tests\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);BattlegroundSpy\**;BattlegroundSpy.Test\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <!-- Release 不生成 .pdb -->
@@ -48,21 +48,6 @@
   <!-- Icon -->
   <ItemGroup>
     <Content Include="icon.ico" CopyToOutputDirectory="PreserveNewest" Link="icon.ico" />
-  </ItemGroup>
-
-  <!-- Tribe icons -->
-  <ItemGroup>
-    <Resource Include="Resources\TribeIcons\*.jpg" />
-  </ItemGroup>
-
-  <!-- Minion overlays -->
-  <ItemGroup>
-    <Resource Include="Resources\Minion\*.png" />
-  </ItemGroup>
-
-  <!-- Fonts -->
-  <ItemGroup>
-    <Resource Include="Resources\*.otf" />
   </ItemGroup>
 
 </Project>

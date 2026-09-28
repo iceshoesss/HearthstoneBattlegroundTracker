@@ -16,23 +16,21 @@
 ## 项目结构
 
 ```
-HDT_BGTracker/
-├── HearthstoneBattlegroundTracker/    # WPF 主程序
-│   ├── BattlegroundSpy/               # 内存读取（UnitySpy）
-│   │   ├── BattlegroundSpyReader.cs   # 核心：MMR、大厅、场面、RatingChange
-│   │   └── Objects/                   # 数据模型
-│   ├── BattlegroundSpy.Test/          # BGSpy 测试程序
-│   ├── Parser/                        # Power.log 解析器
-│   ├── Services/                      # 核心服务
-│   │   ├── GameMonitorService.cs      # 游戏状态机
-│   │   ├── HearthMirrorService.cs     # BGSpy 包装层
-│   │   ├── LeagueClient.cs            # 联赛 API 客户端
-│   │   └── ApiClient.cs               # HTTP API 客户端
-│   ├── Models/                        # 数据模型
-│   ├── Windows/                       # UI（MainWindow + Overlay）
-│   └── Data/                          # 嵌入资源（bg_heroes.json）
-├── LeagueTool/                        # mock 服务器 + 测试工具
-│   └── mock_server.py                 # Python mock 服务器
+HBT/                                   # 基础联赛工具
+├── BattlegroundSpy/                   # 内存读取（UnitySpy）
+│   ├── BattlegroundSpyReader.cs       # 核心：MMR、大厅、排名
+│   └── Objects/                       # 数据模型
+├── BattlegroundSpy.Test/              # BGSpy 测试程序
+├── Parser/                            # Power.log 解析器
+├── Services/                          # 核心服务
+│   ├── GameMonitorService.cs          # 游戏状态机
+│   ├── HearthMirrorService.cs         # BGSpy 包装层
+│   ├── LeagueClient.cs                # 联赛 API 客户端
+│   └── ApiClient.cs                   # HTTP API 客户端
+├── Models/                            # 数据模型
+├── Windows/                           # UI（MainWindow）
+├── Lib/BattlegroundDB.dll             # 卡牌数据库
+├── mock_server.py                     # Python mock 服务器（调试用）
 └── API.md                             # API 文档
 ```
 
@@ -40,17 +38,16 @@ HDT_BGTracker/
 
 ### 前置条件
 
-- .NET 8 SDK
-- Windows x86 环境
+- .NET SDK（含 .NET Framework 4.7.2 目标包）
+- Windows（WPF）
 
 ### 步骤
 
 ```powershell
-cd HearthstoneBattlegroundTracker
 dotnet build -c Release
 ```
 
-编译产物：`bin\Release\net8.0-windows\HearthstoneBattlegroundTracker.exe`
+编译产物：`bin\Release\net472\HearthstoneBattlegroundTracker.exe`
 
 ### 运行测试
 
@@ -94,7 +91,7 @@ dotnet run --project BattlegroundSpy.Test -c Release
 ## 调试（mock 服务器）
 
 ```bash
-python LeagueTool/mock_server.py
+python mock_server.py
 ```
 
 mock 服务器监听 `localhost:5000`，打印所有请求数据，用于调试。

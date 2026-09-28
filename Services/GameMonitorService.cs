@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using BattlegroundSpy.Objects;
-using HBT.Models;
 
 namespace HBT.Services
 {

@@ -10,9 +10,9 @@ HBT (Hearthstone Battleground Tracker) — WPF plugin that reads Hearthstone mem
 dotnet build -c Release
 ```
 
-Targets **.NET Framework 4.72**, x86 only. The README incorrectly says .NET 8 — trust the csproj.
+Targets **.NET Framework 4.72**, AnyCPU (supports 64-bit Hearthstone).
 
-Output: `bin\Release\net472-windows\HearthstoneBattlegroundTracker.exe`
+Output: `bin\Release\net472\HearthstoneBattlegroundTracker.exe`
 
 ## Testing
 
@@ -26,16 +26,16 @@ Requires Hearthstone to be running. Cannot run in CI or headless environments.
 
 ## Architecture
 
-- **Main app** (`HearthstoneBattlegroundTracker.csproj`) — WPF, references BattlegroundSpy + Plugins
+- **Main app** (`HearthstoneBattlegroundTracker.csproj`) — WPF, references BattlegroundSpy
 - **BattlegroundSpy** (`BattlegroundSpy/`) — Memory reader via UnitySpy. Core file: `BattlegroundSpyReader.cs`
 - **UnitySpy** — Linked from `../../HDT_Reverse/unity-spy/` (source compiled into BattlegroundSpy.dll, not vendored in this repo)
-- **Plugins/** — `HdtCompat` and `BobsBuddyCompat` are stub/compatibility assemblies
+- **Basic branch scope** — combat sim / overlay / plugins removed; league tool only
 - **Services/** — `GameMonitorService` (state machine), `HearthMirrorService` (BGSpy wrapper), `LeagueClient`, `ApiClient`
 - **Parser/** — Power.log parser (secondary data source)
 
 ## Key Facts
 
-- Windows-only (WPF + x86)
+- Windows-only (WPF + AnyCPU)
 - Version lives in both `HearthstoneBattlegroundTracker.csproj` and `BattlegroundSpy/BattlegroundSpy.csproj` — update both when bumping
 - `DefaultItemExcludes` in main csproj excludes `BattlegroundSpy\**` and `BattlegroundSpy.Test\**` — they build independently
 - UnitySpy source path is relative (`../../HDT_Reverse/unity-spy/`) — won't resolve outside the original dev machine layout
