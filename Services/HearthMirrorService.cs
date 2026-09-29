@@ -21,6 +21,7 @@ public class HearthMirrorService : IDisposable
     private BattlegroundSpyReader _spy;
     private DateTime _lastPidChangeTime = DateTime.MinValue;
     private int _consecutiveNullCount;  // 连续返回 null 的次数
+    private DateTime _firstNullTime = DateTime.MinValue;  // 本轮连续 null 的起点
 
     public event Action OnConnected;
     public event Action OnDisconnected;
@@ -33,7 +34,10 @@ public class HearthMirrorService : IDisposable
             TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5));
     }
 
-    /// <summary>记录一次读取结果；连续失败超过阈值则销毁缓存的 _spy（可能已因过早 attach 而损坏）</summary>
+    /// <summary>
+    /// 记录一次读取结果。连续 null 说明两种可能：m_myPlayer 尚未就绪，或 _spy 是过早 attach 的坏快照。
+    /// 后者会永远返回 null，必须销毁重建；用「次数 + 时长」双阈值，避免 3s 慢轮询下 100 次要等 5 分钟。
+    /// </summary>
     private void NoteReadResult(bool success)
     {
         lock (_spyGate)
@@ -41,18 +45,28 @@ public class HearthMirrorService : IDisposable
             if (success)
             {
                 _consecutiveNullCount = 0;
+                _firstNullTime = DateTime.MinValue;
                 return;
             }
 
             _consecutiveNullCount++;
-            if (_consecutiveNullCount > 100)  // 连续 100 次返回 null，认为 _spy 已损坏
-            {
-                Console.WriteLine($"[HM] BGSpy 连续返回 null {_consecutiveNullCount} 次，销毁并重建");
-                _spy?.Dispose();
-                _spy = null;
-                _connected = false;
-                _consecutiveNullCount = 0;
-            }
+            if (_firstNullTime == DateTime.MinValue)
+                _firstNullTime = DateTime.UtcNow;
+
+            // 慢轮询（等 Power.log，约 3s/次）靠时长触发；快轮询（100ms）靠次数触发
+            bool tooMany = _consecutiveNullCount >= 15;
+            bool tooLong = (DateTime.UtcNow - _firstNullTime).TotalSeconds >= 20;
+            if (!tooMany && !tooLong)
+                return;
+
+            Console.WriteLine($"[HM] BGSpy 连续 null {_consecutiveNullCount} 次 / {(DateTime.UtcNow - _firstNullTime).TotalSeconds:F0}s，销毁并重建");
+            _spy?.Dispose();
+            _spy = null;
+            _connected = false;
+            _consecutiveNullCount = 0;
+            _firstNullTime = DateTime.MinValue;
+            // 重置预热计时，避免重建后立刻 attach 又踩同一个坑
+            _lastPidChangeTime = DateTime.UtcNow;
         }
     }
 
@@ -99,11 +113,19 @@ public class HearthMirrorService : IDisposable
             {
                 try
                 {
-                    _spy = new BattlegroundSpyReader(_lastHsPid);
+                    var spy = new BattlegroundSpyReader(_lastHsPid);
+                    // 过早 attach 时 Create 会成功，但 BnetPresenceMgr 尚未挂到域里。
+                    // 先探一下，拿不到就丢弃，等下一轮再建，避免缓存坏快照。
+                    if (spy.GetBattleTag() == null && spy.GetAccountId() == null)
+                    {
+                        spy.Dispose();
+                        throw new InvalidOperationException("BGSpy attached but BnetPresenceMgr not ready");
+                    }
+                    _spy = spy;
                 }
                 catch (Exception ex)
                 {
-                    // Mono 未就绪，抛出让调用方重试（保持 _spy=null，下次重新构建）
+                    // Mono / Bnet 未就绪，抛出让调用方重试（保持 _spy=null，下次重新构建）
                     throw new InvalidOperationException($"BGSpy init failed (Mono not ready?): {ex.Message}", ex);
                 }
             }
@@ -145,9 +167,26 @@ public class HearthMirrorService : IDisposable
                     try
                     {
                         if (_spy == null)
-                            _spy = new BattlegroundSpyReader(_lastHsPid);
-                        _connected = true;
-                        justConnected = true;
+                        {
+                            var spy = new BattlegroundSpyReader(_lastHsPid);
+                            // 同样先探 BnetPresenceMgr，避免“已连接但永远读不到”
+                            if (spy.GetBattleTag() == null && spy.GetAccountId() == null)
+                            {
+                                spy.Dispose();
+                                Console.WriteLine("[HM] BGSpy attached but BnetPresenceMgr not ready, retrying");
+                            }
+                            else
+                            {
+                                _spy = spy;
+                                _connected = true;
+                                justConnected = true;
+                            }
+                        }
+                        else
+                        {
+                            _connected = true;
+                            justConnected = true;
+                        }
                     }
                     catch (Exception ex)
                     {
