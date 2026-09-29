@@ -13,8 +13,6 @@ namespace HBT
 /// </summary>
 public class LeagueClient
 {
-    readonly Config _config;
-
     public bool IsLeagueGame { get; set; }
     public string GameUuid { get; set; } = "";
     public string VerificationCode { get; private set; } = "";
@@ -29,12 +27,9 @@ public class LeagueClient
     string? _pendingPlayerTag;
     ulong? _pendingAccountIdLo;
     List<LobbyPlayer> _pendingLobbyPlayers;
-    string? _pendingRegion;
-    string? _pendingMode;
 
-    public LeagueClient(Config config)
+    public LeagueClient()
     {
-        _config = config;
     }
 
     /// <summary>新对局开始时调用</summary>
@@ -48,7 +43,7 @@ public class LeagueClient
 
     /// <summary>STEP 13 时调用，发起 check-league</summary>
     public void OnCheckLeague(string playerTag, ulong accountIdLo,
-        List<LobbyPlayer> lobbyPlayers, string region, string mode,
+        List<LobbyPlayer> lobbyPlayers,
         Func<bool> shouldRetry)
     {
         int generation = _gameGeneration;
@@ -56,7 +51,7 @@ public class LeagueClient
         {
             for (int retry = 0; retry < 3 && shouldRetry(); retry++)
             {
-                var ok = await ApiClient.CheckLeagueAsync(playerTag, accountIdLo, lobbyPlayers, region, mode, DateTime.UtcNow.ToString("o"));
+                var ok = await ApiClient.CheckLeagueAsync(playerTag, accountIdLo, lobbyPlayers, "CN", "solo", DateTime.UtcNow.ToString("o"));
                 if (_gameGeneration != generation) return;
                 if (ok == true)
                 {
@@ -81,8 +76,6 @@ public class LeagueClient
             _pendingPlayerTag = playerTag;
             _pendingAccountIdLo = accountIdLo;
             _pendingLobbyPlayers = lobbyPlayers;
-            _pendingRegion = region;
-            _pendingMode = mode;
 
             _retryTimer?.Dispose();
             _retryTimer = new Timer(async _ =>
@@ -97,7 +90,7 @@ public class LeagueClient
 
                     var retryOk = await ApiClient.CheckLeagueAsync(
                         _pendingPlayerTag!, _pendingAccountIdLo!.Value, _pendingLobbyPlayers!,
-                        _pendingRegion!, _pendingMode!, DateTime.UtcNow.ToString("o"));
+                        "CN", "solo", DateTime.UtcNow.ToString("o"));
 
                     if (_gameGeneration != generation)
                     {
@@ -262,8 +255,6 @@ public class LeagueClient
         _pendingPlayerTag = null;
         _pendingAccountIdLo = null;
         _pendingLobbyPlayers = null;
-        _pendingRegion = null;
-        _pendingMode = null;
     }
 
     void HandleCheckLeagueResult()
@@ -271,12 +262,7 @@ public class LeagueClient
         if (!string.IsNullOrEmpty(ApiClient.ServerGameUuid))
             GameUuid = ApiClient.ServerGameUuid;
 
-        if (_config.TestMode)
-        {
-            Console.WriteLine("[API] [TEST] 强制标记为联赛对局");
-            IsLeagueGame = true;
-        }
-        else if (ApiClient.LastLeagueResult)
+        if (ApiClient.LastLeagueResult)
             IsLeagueGame = true;
 
         if (!string.IsNullOrEmpty(ApiClient.VerificationCode))

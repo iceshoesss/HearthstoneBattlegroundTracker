@@ -5,8 +5,8 @@ namespace HBT
 {
 
 /// <summary>
-    /// LeagueTool 配置
-/// 
+/// 运行时配置（当前仅 API 地址）
+///
 /// 查找顺序：
 /// 1. 环境变量 BGTRACKER_CONFIG 指定的路径
 /// 2. 从 exe 目录向上逐级查找 shared_config.json（最多 5 级）
@@ -16,9 +16,6 @@ namespace HBT
 public class Config
 {
     public string ApiBaseUrl { get; set; } = "http://localhost:5000";
-    public string Region { get; set; } = "CN";
-    public string Mode { get; set; } = "solo";
-    public bool TestMode { get; set; } = false;
 
     public static Config Load()
     {
@@ -85,16 +82,11 @@ public class Config
                 var valPart = trimmed.Substring(colonIdx + 1).Trim().TrimEnd(',');
                 var val = valPart.Trim('"');
 
-                switch (key)
-                {
-                    case "apiBaseUrl": cfg.ApiBaseUrl = val; break;
-                    case "region": cfg.Region = val; break;
-                    case "mode": cfg.Mode = val; break;
-                    case "testMode": cfg.TestMode = val.Trim().ToLower() == "true"; break;
-                }
+                if (key == "apiBaseUrl")
+                    cfg.ApiBaseUrl = val;
             }
 
-            Console.WriteLine($"[Config] apiBaseUrl={cfg.ApiBaseUrl}, region={cfg.Region}, mode={cfg.Mode}");
+            Console.WriteLine($"[Config] apiBaseUrl={cfg.ApiBaseUrl}");
             return cfg;
         }
         catch (Exception e)
@@ -104,4 +96,5 @@ public class Config
         }
     }
 }
+
 }

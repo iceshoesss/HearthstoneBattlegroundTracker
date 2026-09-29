@@ -19,6 +19,11 @@ Thumbs.db
 build_output.txt
 *_crash.log
 
+# Local runtime config (API base URL etc.) — never commit personal endpoints
+config.json
+config.json.example.bak
+shared_config.json
+
 # Web (belongs to feature/card-browser)
 node_modules/
 dist/
