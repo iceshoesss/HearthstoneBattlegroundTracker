@@ -21,6 +21,86 @@ public partial class MainWindow : Window
     private int _pendingPlacement = -1;
     private int _sseReconnects;
 
+    /// <summary>组队完成后隐藏排队进度条</summary>
+    private void SetQueueProgressVisible(bool visible)
+    {
+        if (SideQueuePanel == null) return;
+        SideQueuePanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>同桌名单：n/8 + 可逐条复制</summary>
+    private void SetRoster(IList<string> names, string emptyText = "成组后展示")
+    {
+        if (SideRosterList == null || SideRosterText == null) return;
+        var list = names ?? new List<string>();
+        if (list.Count == 0)
+        {
+            SideRosterList.Visibility = Visibility.Collapsed;
+            SideRosterList.ItemsSource = null;
+            SideRosterText.Visibility = Visibility.Visible;
+            SideRosterText.Text = emptyText;
+            if (SideRosterCount != null) SideRosterCount.Text = "";
+            return;
+        }
+        SideRosterText.Visibility = Visibility.Collapsed;
+        SideRosterList.Visibility = Visibility.Visible;
+        var items = new List<RosterItem>();
+        foreach (var n in list) items.Add(new RosterItem { Name = n });
+        SideRosterList.ItemsSource = items;
+        if (SideRosterCount != null) SideRosterCount.Text = list.Count + " / 8";
+    }
+
+    private void BtnCopyName_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var btn = sender as System.Windows.Controls.Button;
+            var name = btn?.Tag as string;
+            if (string.IsNullOrEmpty(name) || btn == null) return;
+            Clipboard.SetText(name);
+            AppendLog("已复制: " + name);
+            ShowCopySuccess(btn);
+        }
+        catch (Exception ex)
+        {
+            AppendLog("复制失败: " + ex.Message);
+        }
+    }
+
+    /// <summary>复制成功后按钮短暂变为 ✓ 绿色</summary>
+    private void ShowCopySuccess(System.Windows.Controls.Button btn)
+    {
+        btn.Content = "✓";
+        btn.Foreground = new SolidColorBrush(Color.FromRgb(0x22, 0xc5, 0x5e));
+        btn.BorderBrush = new SolidColorBrush(Color.FromRgb(0x22, 0xc5, 0x5e));
+        btn.Background = new SolidColorBrush(Color.FromRgb(0x22, 0xc5, 0x5e));
+        btn.Opacity = 0.95;
+
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(1200)
+        };
+        timer.Tick += (_, __) =>
+        {
+            timer.Stop();
+            try
+            {
+                btn.Content = "⧉";
+                btn.Foreground = new SolidColorBrush(Color.FromRgb(0x94, 0xa3, 0xb8));
+                btn.BorderBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x41, 0x55));
+                btn.Background = new SolidColorBrush(Color.FromRgb(0x1f, 0x29, 0x37));
+                btn.Opacity = 1;
+            }
+            catch { /* 窗口可能已关 */ }
+        };
+        timer.Start();
+    }
+
+    private sealed class RosterItem
+    {
+        public string Name { get; set; }
+    }
+
     public MainWindow()
     {
         InitializeComponent();
@@ -91,6 +171,9 @@ public partial class MainWindow : Window
     {
         // 渐隐完成后的第二次 Close：放行，让 WPF 正常销毁窗口并自然退出应用
         if (_realClose) return;
+
+        // 关闭 HBT 时自动退出排队（方案一）；已开赛/确认名次中由服务端拒绝，不会误退
+        LeaveQueueOnExit();
 
         e.Cancel = true;
         // 渐隐进行中忽略重复关闭请求（连点 X / Alt+F4），避免动画从 1 重播
@@ -328,21 +411,21 @@ public partial class MainWindow : Window
     {
         if (state == "grouped")
         {
-            MatchStatusText.Text = "已成组";
+            MatchStatusText.Text = "组队完成";
             MatchStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x22, 0xc5, 0x5e));
-            SideStateText.Text = "已成组";
+            SideStateText.Text = "组队完成";
             SideStateSub.Text = "请准备进入游戏";
-            SideQueueBar.Width = 220;
+            SetQueueProgressVisible(false);
             SideQueueCount.Text = "8 / 8";
             var names = TryParseTableNames("tableNames\":" + (string.IsNullOrEmpty(tableNamesJson) ? "[]" : tableNamesJson));
             if (names.Count > 0)
             {
-                SideRosterText.Text = string.Join("\n", names);
+                SetRoster(names);
                 SideQueueHint.Text = "同桌已分配，请进游戏";
             }
             else
             {
-                SideRosterText.Text = "已分桌";
+                SetRoster(null, "已分桌");
                 SideQueueHint.Text = "同桌已分配，请进游戏";
             }
             return;
@@ -352,13 +435,15 @@ public partial class MainWindow : Window
             MatchStatusText.Text = "对局中";
             SideStateText.Text = "对局中";
             SideStateSub.Text = "结束后请确认名次";
+            SetQueueProgressVisible(false);
             return;
         }
         MatchStatusText.Text = "排队中";
         MatchStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x3b, 0x82, 0xf6));
         SideStateText.Text = "排队中";
-        SideStateSub.Text = "盲配中，成组后显示同桌匿名名";
-        SideQueueHint.Text = "盲配中，成组后显示同桌名单";
+        SideStateSub.Text = "盲配中，组队完成后显示同桌名单";
+        SideQueueHint.Text = "盲配中，组队完成后显示同桌名单";
+        SetQueueProgressVisible(true);
     }
 
     private async Task JoinQueueAsync()
@@ -420,16 +505,42 @@ public partial class MainWindow : Window
             SideStateSub.Text = "点击「参赛报名」开始";
             BtnSidePrimary.Content = "参赛报名";
             BtnSideSecondary.Visibility = Visibility.Collapsed;
+            SetQueueProgressVisible(true);
             SideQueueBar.Width = 0;
             SideQueueCount.Text = "— / 8";
-            SideRosterText.Text = "成组后展示";
+            SetRoster(null);
             SideConfirmText.Text = "对局结束后在此确认名次";
-            SideQueueHint.Text = "盲配中，成组后显示同桌名单";
+            SideQueueHint.Text = "盲配中，组队完成后显示同桌名单";
             AppendLog("已退出排队");
         }
         catch (Exception ex)
         {
             AppendLog("退出排队失败: " + ex.Message);
+        }
+    }
+
+    /// <summary>进程/窗口退出时静默退排，避免残留在队列里</summary>
+    private void LeaveQueueOnExit()
+    {
+        if (string.IsNullOrEmpty(_matchTicket)) return;
+        try
+        {
+            AppendLog("退出 HBT，自动退出排队…");
+            var task = ApiClient.QueueLeaveAsync(_matchTicket);
+            // 短暂等待，尽量让请求发出去；超时则随进程结束（服务器另有超时清理）
+            if (!task.Wait(1500))
+            {
+                AppendLog("退排请求未确认（进程即将退出）");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendLog("退出时退排失败: " + ex.Message);
+        }
+        finally
+        {
+            try { StopMatchSession(); } catch { /* ignore */ }
+            _matchTicket = "";
         }
     }
 
@@ -493,16 +604,16 @@ public partial class MainWindow : Window
             var state = TryParseStrField(json, "state");
             if (state == "grouped")
             {
-                MatchStatusText.Text = "已成组";
+                MatchStatusText.Text = "组队完成";
                 MatchStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x22, 0xc5, 0x5e));
-                SideStateText.Text = "已成组";
+                SideStateText.Text = "组队完成";
                 SideStateSub.Text = "请准备进入游戏";
-                SideQueueBar.Width = 220;
+                SetQueueProgressVisible(false);
                 SideQueueCount.Text = "8 / 8";
                 var names = TryParseTableNames(json);
                 if (names.Count > 0)
                 {
-                    SideRosterText.Text = string.Join("\n", names);
+                    SetRoster(names);
                     SideQueueHint.Text = "同桌已分配，请进游戏";
                 }
             }
@@ -544,6 +655,8 @@ public partial class MainWindow : Window
         {
             if (type == "queue_count")
             {
+                // 组队完成后不再显示排队进度
+                if (SideQueuePanel != null && SideQueuePanel.Visibility != Visibility.Visible) return;
                 var count = TryParseIntField(json, "count");
                 var pool = TryParseIntField(json, "poolQueued");
                 var minPlayers = TryParseIntField(json, "minPlayers");
@@ -561,7 +674,7 @@ public partial class MainWindow : Window
                 {
                     SideQueueHint.Text = count >= minPlayers
                         ? "已满员，正在分桌…"
-                        : "盲配中，成组后显示同桌名单";
+                        : "盲配中，组队完成后显示同桌名单";
                 }
             }
         }
@@ -572,14 +685,15 @@ public partial class MainWindow : Window
             var tags = type == "roster" ? TryParseNamedArray(json, "tags") : TryParseNamedArray(json, "tableTags");
             var list = tags.Count >= names.Count && tags.Count > 0 ? tags : names;
             if (list.Count == 0) list = names;
-            SideRosterText.Text = list.Count > 0 ? string.Join("\n", list) : "（空）";
+            SetRoster(list, "（空）");
             SideQueueHint.Text = "同桌名单已更新（含新补入 / 已退出）";
             SideQueueCount.Text = list.Count + " / 8";
-            SideQueueBar.Width = Math.Min(220.0, 220.0 * list.Count / 8.0);
-            if (SideStateText.Text == "排队中" || SideStateText.Text == "已成组")
+            SetQueueProgressVisible(false);
+            if (SideStateText.Text == "排队中" || SideStateText.Text == "已成组" || SideStateText.Text == "组队完成")
             {
-                SideStateText.Text = "已成组";
-                MatchStatusText.Text = "已成组";
+                SideStateText.Text = "组队完成";
+                SideStateSub.Text = "请准备进入游戏";
+                MatchStatusText.Text = "组队完成";
                 MatchStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x22, 0xc5, 0x5e));
             }
         }

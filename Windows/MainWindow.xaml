@@ -136,8 +136,8 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 排队进度 -->
-                        <Border Background="#111827" BorderBrush="#1f2937" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,10">
+                        <!-- 排队进度（组队完成后隐藏） -->
+                        <Border x:Name="SideQueuePanel" Background="#111827" BorderBrush="#1f2937" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
                                 <Grid>
                                     <TextBlock Text="排队进度" FontSize="10" Foreground="#64748b" VerticalAlignment="Center"/>
@@ -153,8 +153,32 @@
                         <!-- 同桌名单 / ready -->
                         <Border Background="#111827" BorderBrush="#1f2937" BorderThickness="1" CornerRadius="10" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
-                                <TextBlock Text="同桌名单" FontSize="10" Foreground="#64748b"/>
-                                <TextBlock x:Name="SideRosterText" Text="成组后展示" FontSize="11" Foreground="#94a3b8" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                <Grid>
+                                    <TextBlock Text="同桌名单" FontSize="10" Foreground="#64748b" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="SideRosterCount" Text="" FontSize="10" Foreground="#64748b" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                                <TextBlock x:Name="SideRosterText" Text="成组后展示" FontSize="12" Foreground="#94a3b8" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                <ItemsControl x:Name="SideRosterList" Margin="0,4,0,0" Visibility="Collapsed">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,3,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="13"
+                                                           Foreground="#e2e8f0" VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <Button Grid.Column="1" Content="⧉" Width="28" Height="24" Margin="8,0,0,0"
+                                                        FontSize="12" Padding="0" Cursor="Hand"
+                                                        Background="#1f2937" Foreground="#94a3b8" BorderBrush="#334155"
+                                                        ToolTip="复制"
+                                                        Tag="{Binding Name}"
+                                                        Click="BtnCopyName_Click"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </StackPanel>
                         </Border>
 
