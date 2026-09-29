@@ -1,13 +1,14 @@
 using System;
 using System.IO;
-using System.Net.Http;
+using System.Net.WebSockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace HBT
 {
 /// <summary>
-/// 一场一连：SSE 事件流。ticket 在 queue/join 时发放。
+/// 一场一连：WebSocket 事件流。ticket 在 queue/join 时发放。
 /// 支持短暂断线重连；Stop/Dispose 会取消并丢弃过期连接。
 /// </summary>
 public class MatchSessionClient : IDisposable
@@ -19,7 +20,13 @@ public class MatchSessionClient : IDisposable
     private int _generation;
 
     public Action<string> OnEventJson { get; set; }
+    /// <summary>WebSocket 已建立（用于连接指示灯）</summary>
+    public Action OnOpen { get; set; }
+    /// <summary>连接结束/失败（用于连接指示灯）</summary>
     public Action OnClosed { get; set; }
+
+    /// <summary>当前是否连着 WS</summary>
+    public bool IsConnected { get; private set; }
 
     public MatchSessionClient(string baseUrl, string ticket)
     {
@@ -37,6 +44,7 @@ public class MatchSessionClient : IDisposable
 
     public void Stop()
     {
+        IsConnected = false;
         try { _cts?.Cancel(); } catch { }
         _cts = null;
         var loop = _loop;
@@ -54,60 +62,76 @@ public class MatchSessionClient : IDisposable
         {
             try
             {
-                using (var http = new HttpClient(new HttpClientHandler { UseProxy = false }))
+                using (var ws = new ClientWebSocket())
                 {
-                    http.Timeout = Timeout.InfiniteTimeSpan;
-                    var url = _baseUrl + "/api/plugin/match/events?ticket=" + Uri.EscapeDataString(_ticket);
-                    using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+                    ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
+                    var uri = BuildWsUri();
+                    Console.WriteLine("[MATCH] WS 连接 " + uri);
+                    await ws.ConnectAsync(uri, ct);
+                    if (_generation != generation) return;
+                    IsConnected = true;
+                    OnOpen?.Invoke();
+
+                    var buf = new byte[16 * 1024];
+                    var sb = new StringBuilder();
+                    fail = 0;
+                    while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
                     {
-                        request.Headers.Add("X-Match-Ticket", _ticket);
-                        request.Headers.Add("X-HDT-Plugin", "0.7.0");
-                        using (var resp = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct))
-                        using (var stream = await resp.Content.ReadAsStreamAsync())
-                        using (var reader = new StreamReader(stream))
+                        sb.Length = 0;
+                        WebSocketReceiveResult result;
+                        do
                         {
-                            fail = 0;
-                            while (!ct.IsCancellationRequested)
+                            result = await ws.ReceiveAsync(new ArraySegment<byte>(buf), ct);
+                            if (result.MessageType == WebSocketMessageType.Close)
                             {
-                                var line = await ReadLineWithTimeoutAsync(reader, ct, 180000);
-                                if (line == null) break;
-                                if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
-                                var payload = line.Substring(5).Trim();
-                                if (payload.Length == 0) continue;
-                                if (payload.Contains("\"type\":\"ping\"")) continue;
-                                if (_generation != generation) return;
-                                OnEventJson?.Invoke(payload);
+                                await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+                                break;
                             }
-                        }
+                            sb.Append(Encoding.UTF8.GetString(buf, 0, result.Count));
+                        } while (!result.EndOfMessage);
+
+                        if (result.MessageType == WebSocketMessageType.Close) break;
+                        if (_generation != generation) return;
+
+                        var payload = sb.ToString().Trim();
+                        if (payload.Length == 0) continue;
+                        if (payload.Contains("\"type\":\"pong\"")) continue;
+                        if (payload.Contains("\"type\":\"ping\"")) continue;
+                        OnEventJson?.Invoke(payload);
                     }
                 }
             }
             catch (Exception ex)
             {
+                IsConnected = false;
                 if (ct.IsCancellationRequested || _generation != generation) return;
                 fail++;
-                Console.WriteLine("[MATCH] SSE 中断(" + fail + "): " + ex.Message);
+                Console.WriteLine("[MATCH] WS 中断(" + fail + "): " + ex.Message);
                 try { await Task.Delay(TimeSpan.FromSeconds(Math.Min(30, 2 * fail)), ct); }
-                catch { return; }
+                catch { IsConnected = false; return; }
                 if (_generation != generation) return;
                 continue;
             }
+            IsConnected = false;
             break;
         }
 
+        IsConnected = false;
         if (!ct.IsCancellationRequested && _generation == generation)
             OnClosed?.Invoke();
     }
 
-    private static async Task<string> ReadLineWithTimeoutAsync(StreamReader reader, CancellationToken ct, int timeoutMs)
+    private Uri BuildWsUri()
     {
-        var task = reader.ReadLineAsync();
-        var completed = await Task.WhenAny(task, Task.Delay(timeoutMs, ct));
-        if (completed != task)
-        {
-            throw new TimeoutException("SSE read timeout");
-        }
-        return await task;
+        var http = _baseUrl;
+        string wsBase;
+        if (http.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            wsBase = "wss://" + http.Substring("https://".Length);
+        else if (http.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            wsBase = "ws://" + http.Substring("http://".Length);
+        else
+            wsBase = "ws://" + http;
+        return new Uri(wsBase.TrimEnd('/') + "/api/plugin/match/ws?ticket=" + Uri.EscapeDataString(_ticket));
     }
 
     public void Dispose() { Stop(); }

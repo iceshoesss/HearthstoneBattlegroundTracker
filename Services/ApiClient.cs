@@ -536,12 +536,24 @@ public static class ApiClient
 
     // ── Phase2：一场一连 — 报名 / 取消 / 名次确认 ──
 
-    public static async Task<string> QueueJoinAsync(string battleTag)
+    public class QueueJoinResult
+    {
+        public string Ticket = "";
+        public string State = "";
+        public string TableNamesJson = "";
+    }
+
+    public static async Task<QueueJoinResult> QueueJoinAsync(string battleTag)
     {
         var body = new Dictionary<string, object> { { "battleTag", battleTag } };
         var (ok, json) = await PostAsync("/api/plugin/queue/join", body);
-        if (!ok) { LastError = json; return ""; }
-        return ExtractJsonString(json, "ticket");
+        if (!ok) { LastError = json; return new QueueJoinResult(); }
+        return new QueueJoinResult
+        {
+            Ticket = ExtractJsonString(json, "ticket"),
+            State = ExtractJsonString(json, "state"),
+            TableNamesJson = ExtractJsonArray(json, "tableNames"),
+        };
     }
 
     public static async Task<bool> QueueLeaveAsync(string ticket)
@@ -663,6 +675,19 @@ public static class ApiClient
     {
         return s.Replace("\\", "\\\\").Replace("\"", "\\\"")
                 .Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t");
+    }
+
+    private static string ExtractJsonArray(string json, string key)
+    {
+        if (string.IsNullOrEmpty(json)) return "";
+        var needle = "\"" + key + "\":";
+        var idx = json.IndexOf(needle, StringComparison.Ordinal);
+        if (idx < 0) return "";
+        var bracket = json.IndexOf('[', idx);
+        if (bracket < 0) return "";
+        var end = json.IndexOf(']', bracket);
+        if (end < 0) return "";
+        return json.Substring(bracket, end - bracket + 1);
     }
 
     private static string ExtractJsonString(string json, string key)

@@ -283,6 +283,7 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>副按钮仅用于「名次有异议」；退排/取消只保留主按钮「退出排队」</summary>
     private async void BtnSideSecondary_Click(object sender, RoutedEventArgs e)
     {
         if (BtnSideSecondary.IsEnabled == false) return;
@@ -292,11 +293,6 @@ public partial class MainWindow : Window
             if (_pendingPlacement >= 0)
             {
                 await ConfirmPlacementAsync(_pendingPlacement, false);
-                return;
-            }
-            if (!string.IsNullOrEmpty(_matchTicket))
-            {
-                await LeaveQueueAsync();
             }
         }
         finally
@@ -328,6 +324,43 @@ public partial class MainWindow : Window
         var _ = LeaveQueueAsync();
     }
 
+    private void ApplyMatchState(string state, string tableNamesJson)
+    {
+        if (state == "grouped")
+        {
+            MatchStatusText.Text = "已成组";
+            MatchStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x22, 0xc5, 0x5e));
+            SideStateText.Text = "已成组";
+            SideStateSub.Text = "请准备进入游戏";
+            SideQueueBar.Width = 220;
+            SideQueueCount.Text = "8 / 8";
+            var names = TryParseTableNames("tableNames\":" + (string.IsNullOrEmpty(tableNamesJson) ? "[]" : tableNamesJson));
+            if (names.Count > 0)
+            {
+                SideRosterText.Text = string.Join("\n", names);
+                SideQueueHint.Text = "同桌已分配，请进游戏";
+            }
+            else
+            {
+                SideRosterText.Text = "已分桌";
+                SideQueueHint.Text = "同桌已分配，请进游戏";
+            }
+            return;
+        }
+        if (state == "in_game")
+        {
+            MatchStatusText.Text = "对局中";
+            SideStateText.Text = "对局中";
+            SideStateSub.Text = "结束后请确认名次";
+            return;
+        }
+        MatchStatusText.Text = "排队中";
+        MatchStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x3b, 0x82, 0xf6));
+        SideStateText.Text = "排队中";
+        SideStateSub.Text = "盲配中，成组后显示同桌匿名名";
+        SideQueueHint.Text = "盲配中，成组后显示同桌名单";
+    }
+
     private async Task JoinQueueAsync()
     {
         try
@@ -342,9 +375,9 @@ public partial class MainWindow : Window
             SideStateText.Text = "连接中…";
             SideStateSub.Text = "正在报名联赛匹配";
             BtnSidePrimary.IsEnabled = false;
-            var ticket = await ApiClient.QueueJoinAsync(tag);
+            var join = await ApiClient.QueueJoinAsync(tag);
             BtnSidePrimary.IsEnabled = true;
-            if (string.IsNullOrEmpty(ticket))
+            if (string.IsNullOrEmpty(join.Ticket))
             {
                 SideStateText.Text = "报名失败";
                 SideStateSub.Text = ApiClient.LastError.Length > 80 ? ApiClient.LastError.Substring(0, 80) : ApiClient.LastError;
@@ -352,17 +385,14 @@ public partial class MainWindow : Window
                 AppendLog("报名失败: " + ApiClient.LastError);
                 return;
             }
-            _matchTicket = ticket;
-            MatchStatusText.Text = "排队中";
-            MatchStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x3b, 0x82, 0xf6));
-            SideStateText.Text = "排队中";
-            SideStateSub.Text = "盲配中，成组后显示同桌匿名名";
+            _matchTicket = join.Ticket;
             BtnSidePrimary.Content = "退出排队";
-            BtnSideSecondary.Visibility = Visibility.Visible;
-            BtnSideSecondary.Content = "取消排队";
+            BtnSideSecondary.Visibility = Visibility.Collapsed;
+            // 报名回包可能已是 grouped（插件中途加入）
+            ApplyMatchState(join.State ?? "queued", join.TableNamesJson ?? "");
             StartMatchSession();
             _sseReconnects = 0;
-            AppendLog("已报名，ticket=" + ticket.Substring(0, Math.Min(8, ticket.Length)) + "…");
+            AppendLog("已报名，ticket=" + join.Ticket.Substring(0, Math.Min(8, join.Ticket.Length)) + "… state=" + join.State);
         }
         catch (Exception ex)
         {
@@ -392,6 +422,9 @@ public partial class MainWindow : Window
             BtnSideSecondary.Visibility = Visibility.Collapsed;
             SideQueueBar.Width = 0;
             SideQueueCount.Text = "— / 8";
+            SideRosterText.Text = "成组后展示";
+            SideConfirmText.Text = "对局结束后在此确认名次";
+            SideQueueHint.Text = "盲配中，成组后显示同桌名单";
             AppendLog("已退出排队");
         }
         catch (Exception ex)
@@ -432,12 +465,14 @@ public partial class MainWindow : Window
         MarkSseDisconnected();
         _matchSession = new MatchSessionClient(ApiClient.BaseUrl, _matchTicket)
         {
-            OnEventJson = json => Dispatcher.BeginInvoke(new Action(() =>
+            // 绿/黄点只反映 WS 是否连着，与按钮无关
+            OnOpen = () => Dispatcher.BeginInvoke(new Action(MarkSseConnected)),
+            OnEventJson = json => Dispatcher.BeginInvoke(new Action(() => HandleMatchEvent(json))),
+            OnClosed = () => Dispatcher.BeginInvoke(new Action(() =>
             {
-                MarkSseConnected();
-                HandleMatchEvent(json);
+                MarkSseDisconnected();
+                OnMatchStreamClosed();
             })),
-            OnClosed = () => Dispatcher.BeginInvoke(new Action(OnMatchStreamClosed)),
         };
         _matchSession.Start();
     }
@@ -446,17 +481,15 @@ public partial class MainWindow : Window
     {
         try { _matchSession?.Dispose(); } catch { }
         _matchSession = null;
+        MarkSseDisconnected();
     }
 
     private void HandleMatchEvent(string json)
     {
-#if DEBUG
         AppendLog("事件: " + json);
-#endif
         var type = TryParseStrField(json, "type");
         if (type == "state")
         {
-            MarkSseConnected();
             var state = TryParseStrField(json, "state");
             if (state == "grouped")
             {
@@ -509,13 +542,18 @@ public partial class MainWindow : Window
         }
         else if (type == "queue_count" || type == "ping")
         {
-            MarkSseConnected();
             if (type == "queue_count")
             {
                 var count = TryParseIntField(json, "count");
+                var pool = TryParseIntField(json, "poolQueued");
                 var minPlayers = TryParseIntField(json, "minPlayers");
                 if (minPlayers <= 0) minPlayers = 8;
                 if (count < 0) count = 0;
+                // 排队中优先显示真实排队池人数（与网页一致）
+                if (pool >= 0 && (MatchStatusText.Text == "排队中" || count < minPlayers))
+                {
+                    if (pool <= count || MatchStatusText.Text == "排队中") count = pool;
+                }
                 SideQueueCount.Text = count + " / " + minPlayers;
                 var barWidth = Math.Min(220.0, 220.0 * count / minPlayers);
                 SideQueueBar.Width = barWidth;
@@ -527,9 +565,26 @@ public partial class MainWindow : Window
                 }
             }
         }
+        else if (type == "table_update")
+        {
+            var names = TryParseNamedArray(json, "tableNames");
+            var tags = TryParseNamedArray(json, "tableTags");
+            var list = tags.Count >= names.Count && tags.Count > 0 ? tags : names;
+            if (list.Count > 0)
+            {
+                SideRosterText.Text = string.Join("\n", list);
+                SideQueueHint.Text = "同桌名单已更新（含新补入 / 已退出）";
+                SideQueueCount.Text = list.Count + " / 8";
+                SideQueueBar.Width = Math.Min(220.0, 220.0 * list.Count / 8.0);
+            }
+            if (SideStateText.Text == "排队中" || SideStateText.Text == "已成组")
+            {
+                SideStateText.Text = "已成组";
+                MatchStatusText.Text = "已成组";
+            }
+        }
         else if (type == "confirm_placement")
         {
-            MarkSseConnected();
             var placement = TryParseIntField(json, "yourPlacement");
             if (placement >= 0)
             {
@@ -551,6 +606,25 @@ public partial class MainWindow : Window
     {
         if (SseDot == null) return;
         SseDot.Background = new SolidColorBrush(Color.FromRgb(0xe2, 0xb7, 0x14));
+    }
+
+    private static List<string> TryParseNamedArray(string json, string key)
+    {
+        var list = new List<string>();
+        var needle = "\"" + key + "\":";
+        var idx = json.IndexOf(needle, StringComparison.Ordinal);
+        if (idx < 0) return list;
+        var bracket = json.IndexOf('[', idx + needle.Length);
+        if (bracket < 0) return list;
+        var end = json.IndexOf(']', bracket + 1);
+        if (end < 0) return list;
+        var arr = json.Substring(bracket + 1, end - bracket - 1);
+        foreach (var part in arr.Split(','))
+        {
+            var s = part.Trim().Trim('"');
+            if (s.Length > 0) list.Add(s);
+        }
+        return list;
     }
 
     private static List<string> TryParseTableNames(string json)
