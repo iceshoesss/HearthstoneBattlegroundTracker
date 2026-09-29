@@ -18,6 +18,8 @@ public class MatchSessionClient : IDisposable
     private CancellationTokenSource _cts;
     private Task _loop;
     private int _generation;
+    private ClientWebSocket _ws;
+    private readonly object _sendLock = new object();
 
     public Action<string> OnEventJson { get; set; }
     /// <summary>WebSocket 已建立（用于连接指示灯）</summary>
@@ -27,6 +29,27 @@ public class MatchSessionClient : IDisposable
 
     /// <summary>当前是否连着 WS</summary>
     public bool IsConnected { get; private set; }
+
+    /// <summary>向服务器发一条 JSON（如 in_room 状态）；未连接返回 false</summary>
+    public bool SendJson(string json)
+    {
+        try
+        {
+            var ws = _ws;
+            if (ws == null || ws.State != WebSocketState.Open) return false;
+            var buf = Encoding.UTF8.GetBytes(json ?? "{}");
+            lock (_sendLock)
+            {
+                ws.SendAsync(new ArraySegment<byte>(buf), WebSocketMessageType.Text, true, CancellationToken.None)
+                    .Wait(2000);
+            }
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     public MatchSessionClient(string baseUrl, string ticket)
     {
@@ -45,6 +68,7 @@ public class MatchSessionClient : IDisposable
     public void Stop()
     {
         IsConnected = false;
+        _ws = null;
         try { _cts?.Cancel(); } catch { }
         _cts = null;
         var loop = _loop;
@@ -69,6 +93,7 @@ public class MatchSessionClient : IDisposable
                     Console.WriteLine("[MATCH] WS 连接 " + uri);
                     await ws.ConnectAsync(uri, ct);
                     if (_generation != generation) return;
+                    _ws = ws;
                     IsConnected = true;
                     OnOpen?.Invoke();
 
@@ -103,6 +128,7 @@ public class MatchSessionClient : IDisposable
             }
             catch (Exception ex)
             {
+                _ws = null;
                 IsConnected = false;
                 if (ct.IsCancellationRequested || _generation != generation) return;
                 fail++;
@@ -112,6 +138,7 @@ public class MatchSessionClient : IDisposable
                 if (_generation != generation) return;
                 continue;
             }
+            _ws = null;
             IsConnected = false;
             break;
         }

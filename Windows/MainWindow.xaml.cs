@@ -20,6 +20,8 @@ public partial class MainWindow : Window
     private MatchSessionClient _matchSession;
     private int _pendingPlacement = -1;
     private int _sseReconnects;
+    private bool? _lastInRoom;
+    private System.Windows.Threading.DispatcherTimer _roomTimer;
 
     /// <summary>组队完成后隐藏排队进度条</summary>
     private void SetQueueProgressVisible(bool visible)
@@ -28,8 +30,8 @@ public partial class MainWindow : Window
         SideQueuePanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    /// <summary>同桌名单：n/8 + 可逐条复制</summary>
-    private void SetRoster(IList<string> names, string emptyText = "成组后展示")
+    /// <summary>同桌名单：n/8 + 可逐条复制；inRoom 的名字标绿</summary>
+    private void SetRoster(IList<string> names, string emptyText = "成组后展示", IList<bool> inRoom = null)
     {
         if (SideRosterList == null || SideRosterText == null) return;
         var list = names ?? new List<string>();
@@ -45,7 +47,11 @@ public partial class MainWindow : Window
         SideRosterText.Visibility = Visibility.Collapsed;
         SideRosterList.Visibility = Visibility.Visible;
         var items = new List<RosterItem>();
-        foreach (var n in list) items.Add(new RosterItem { Name = n });
+        for (int i = 0; i < list.Count; i++)
+        {
+            bool room = inRoom != null && i < inRoom.Count && inRoom[i];
+            items.Add(new RosterItem { Name = list[i], InRoom = room });
+        }
         SideRosterList.ItemsSource = items;
         if (SideRosterCount != null) SideRosterCount.Text = list.Count + " / 8";
     }
@@ -99,6 +105,47 @@ public partial class MainWindow : Window
     private sealed class RosterItem
     {
         public string Name { get; set; }
+        public bool InRoom { get; set; }
+    }
+
+    /// <summary>轮询自己是否在房间，边沿变化时经 WS 上报</summary>
+    private void StartRoomWatch()
+    {
+        if (_roomTimer != null) return;
+        _roomTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(2)
+        };
+        _roomTimer.Tick += (_, __) => ReportInRoomIfChanged();
+        _roomTimer.Start();
+    }
+
+    private void StopRoomWatch()
+    {
+        try { _roomTimer?.Stop(); } catch { /* ignore */ }
+        _roomTimer = null;
+        _lastInRoom = null;
+    }
+
+    private void ReportInRoomIfChanged()
+    {
+        if (string.IsNullOrEmpty(_matchTicket) || _matchSession == null) return;
+        try
+        {
+            bool inRoom = _hm != null && _hm.IsInPartyRoom();
+            if (_lastInRoom == inRoom) return;
+            _lastInRoom = inRoom;
+            var ok = _matchSession.SendJson(inRoom
+                ? "{\"type\":\"in_room\",\"ok\":true}"
+                : "{\"type\":\"in_room\",\"ok\":false}");
+            AppendLog(ok
+                ? (inRoom ? "已进房，上报服务器" : "已离房，上报服务器")
+                : "进房状态上报失败（WS 未连接）");
+        }
+        catch (Exception ex)
+        {
+            AppendLog("进房检测失败: " + ex.Message);
+        }
     }
 
     public MainWindow()
@@ -135,6 +182,16 @@ public partial class MainWindow : Window
 
         // 订阅核心事件
         _monitor.OnPhaseChanged += (phase, game) => Dispatcher.Invoke(() => UpdatePhaseUI(phase, game));
+        // 场景 15(BACON 大厅) → 4(GAMEPLAY)：战棋正式开局，停止进房轮询
+        _monitor.OnSceneChanged += scene => Dispatcher.Invoke(() =>
+        {
+            var prev = _monitor.LastScene;
+            if (prev == SceneMode.BACON && scene == SceneMode.GAMEPLAY)
+            {
+                StopRoomWatch();
+                AppendLog("场景 15→4，战棋开局，停止进房检测");
+            }
+        });
         _monitor.OnVerifyCodeChanged += code => Dispatcher.Invoke(() => VerifyCode.Text = code);
         _monitor.OnLogMessage += msg => Dispatcher.Invoke(() => AppendLog(msg));
         _monitor.OnPlayerNameChanged += name => Dispatcher.Invoke(() =>
@@ -428,6 +485,8 @@ public partial class MainWindow : Window
                 SetRoster(null, "已分桌");
                 SideQueueHint.Text = "同桌已分配，请进游戏";
             }
+            // 进房轮询：组队完成 → 正式开局前才有意义
+            StartRoomWatch();
             return;
         }
         if (state == "in_game")
@@ -436,6 +495,8 @@ public partial class MainWindow : Window
             SideStateText.Text = "对局中";
             SideStateSub.Text = "结束后请确认名次";
             SetQueueProgressVisible(false);
+            // 正式开局后不必再检测进房
+            StopRoomWatch();
             return;
         }
         MatchStatusText.Text = "排队中";
@@ -476,6 +537,8 @@ public partial class MainWindow : Window
             // 报名回包可能已是 grouped（插件中途加入）
             ApplyMatchState(join.State ?? "queued", join.TableNamesJson ?? "");
             StartMatchSession();
+            // 中途加入且已是 grouped 时，ApplyMatchState 会开轮询；queued 则等成组再开
+            if ((join.State ?? "") == "grouped") StartRoomWatch();
             _sseReconnects = 0;
             AppendLog("已报名，ticket=" + join.Ticket.Substring(0, Math.Min(8, join.Ticket.Length)) + "… state=" + join.State);
         }
@@ -574,10 +637,17 @@ public partial class MainWindow : Window
     {
         StopMatchSession();
         MarkSseDisconnected();
+        _lastInRoom = null;
         _matchSession = new MatchSessionClient(ApiClient.BaseUrl, _matchTicket)
         {
             // 绿/黄点只反映 WS 是否连着，与按钮无关
-            OnOpen = () => Dispatcher.BeginInvoke(new Action(MarkSseConnected)),
+            OnOpen = () => Dispatcher.BeginInvoke(new Action(() =>
+            {
+                MarkSseConnected();
+                // 连上立刻补报进房状态
+                _lastInRoom = null;
+                ReportInRoomIfChanged();
+            })),
             OnEventJson = json => Dispatcher.BeginInvoke(new Action(() => HandleMatchEvent(json))),
             OnClosed = () => Dispatcher.BeginInvoke(new Action(() =>
             {
@@ -590,6 +660,7 @@ public partial class MainWindow : Window
 
     private void StopMatchSession()
     {
+        StopRoomWatch();
         try { _matchSession?.Dispose(); } catch { }
         _matchSession = null;
         MarkSseDisconnected();
@@ -616,6 +687,7 @@ public partial class MainWindow : Window
                     SetRoster(names);
                     SideQueueHint.Text = "同桌已分配，请进游戏";
                 }
+                StartRoomWatch();
             }
             else if (state == "ready")
             {
@@ -623,19 +695,23 @@ public partial class MainWindow : Window
                 SideStateText.Text = "准备就绪";
                 SideStateSub.Text = "请创建/进入房间";
                 BtnSidePrimary.Content = "准备好了";
+                StartRoomWatch();
             }
             else if (state == "in_game")
             {
                 MatchStatusText.Text = "对局中";
                 SideStateText.Text = "对局中";
                 SideStateSub.Text = "结束后请确认名次";
+                StopRoomWatch();
             }
             else if (state == "reporting")
             {
                 SideStateText.Text = "收集中名次";
+                StopRoomWatch();
             }
             else if (state == "confirm")
             {
+                StopRoomWatch();
                 MatchStatusText.Text = "请确认名次";
                 MatchStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0xf5, 0x9e, 0x0b));
                 SideStateText.Text = "请确认你的名次";
@@ -649,6 +725,7 @@ public partial class MainWindow : Window
                 MatchStatusText.Text = "已结算";
                 SideStateText.Text = "已结算";
                 BtnSidePrimary.Content = "返回";
+                StopRoomWatch();
             }
         }
         else if (type == "queue_count" || type == "ping")
@@ -680,13 +757,14 @@ public partial class MainWindow : Window
         }
         else if (type == "table_update" || type == "roster")
         {
-            // roster: {type, names[], tags[], count}  table_update: {tableNames, tableTags, ...}
+            // roster: {type, names[], tags[], count, inRooms[]}  table_update: {tableNames, tableTags, inRooms, ...}
             var names = type == "roster" ? TryParseNamedArray(json, "names") : TryParseNamedArray(json, "tableNames");
             var tags = type == "roster" ? TryParseNamedArray(json, "tags") : TryParseNamedArray(json, "tableTags");
             var list = tags.Count >= names.Count && tags.Count > 0 ? tags : names;
             if (list.Count == 0) list = names;
-            SetRoster(list, "（空）");
-            SideQueueHint.Text = "同桌名单已更新（含新补入 / 已退出）";
+            var inRooms = ParseBoolArray(json, "inRooms");
+            SetRoster(list, "（空）", inRooms);
+            SideQueueHint.Text = "同桌名单已更新（绿名=已进房）";
             SideQueueCount.Text = list.Count + " / 8";
             SetQueueProgressVisible(false);
             if (SideStateText.Text == "排队中" || SideStateText.Text == "已成组" || SideStateText.Text == "组队完成")
@@ -737,6 +815,26 @@ public partial class MainWindow : Window
         {
             var s = part.Trim().Trim('"');
             if (s.Length > 0) list.Add(s);
+        }
+        return list;
+    }
+
+    /// <summary>解析 [true,false,...] 布尔数组（与名单下标对齐）</summary>
+    private static List<bool> ParseBoolArray(string json, string key)
+    {
+        var list = new List<bool>();
+        var needle = "\"" + key + "\":";
+        var idx = json.IndexOf(needle, StringComparison.Ordinal);
+        if (idx < 0) return list;
+        var bracket = json.IndexOf('[', idx + needle.Length);
+        if (bracket < 0) return list;
+        var end = json.IndexOf(']', bracket + 1);
+        if (end < 0) return list;
+        var arr = json.Substring(bracket + 1, end - bracket - 1);
+        foreach (var part in arr.Split(','))
+        {
+            var s = part.Trim().Trim('"').ToLowerInvariant();
+            list.Add(s == "true" || s == "1");
         }
         return list;
     }

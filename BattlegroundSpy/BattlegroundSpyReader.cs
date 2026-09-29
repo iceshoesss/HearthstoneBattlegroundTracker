@@ -473,6 +473,37 @@ public sealed class BattlegroundSpyReader : IDisposable
     }
 
     /// <summary>
+    /// 是否已在好友/自定义房间：PartyManager.m_partyData.m_partyId 非空。
+    /// 战棋开房约 scenarioId=3459、type=3，版本会变，故只信 partyId。
+    /// </summary>
+    public bool IsInPartyRoom()
+    {
+        try
+        {
+            dynamic pm = null;
+            try { pm = _hsImage?.GetService("PartyManager", false); } catch { pm = null; }
+            if (pm == null)
+            {
+                try { pm = _image?["PartyManager"]?["s_instance"]; } catch { pm = null; }
+            }
+            if (pm == null) return false;
+            dynamic pd = null;
+            try { pd = pm["m_partyData"]; } catch { return false; }
+            if (pd == null) return false;
+            try
+            {
+                var partyId = pd["m_partyId"];
+                return partyId != null;
+            }
+            catch { return false; }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 检测好友列表是否打开。
     /// 路径: ChatMgr.s_instance.m_friendListFrame != null
     /// </summary>

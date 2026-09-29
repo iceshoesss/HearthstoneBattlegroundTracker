@@ -167,8 +167,20 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="13"
-                                                           Foreground="#e2e8f0" VerticalAlignment="Center"
-                                                           TextTrimming="CharacterEllipsis"/>
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="#e2e8f0"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding InRoom}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#34d399"/>
+                                                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                                 <Button Grid.Column="1" Content="⧉" Width="28" Height="24" Margin="8,0,0,0"
                                                         FontSize="12" Padding="0" Cursor="Hand"
                                                         Background="#1f2937" Foreground="#94a3b8" BorderBrush="#334155"

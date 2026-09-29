@@ -431,6 +431,13 @@ public class HearthMirrorService : IDisposable
         catch { return null; }
     }
 
+    /// <summary>是否已在房间（PartyManager.m_partyData.m_partyId 非空）</summary>
+    public bool IsInPartyRoom()
+    {
+        try { return GetSpy().IsInPartyRoom(); }
+        catch { return false; }
+    }
+
     /// <summary>检测好友列表是否打开</summary>
     public bool IsFriendsListVisible()
     {
