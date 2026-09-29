@@ -94,6 +94,43 @@ public class GameMonitorService : IDisposable
     public int StartMmr => _startMmr;
     public int CurrentMmr => _lastKnownMmr;
 
+    /// <summary>
+    /// 手动刷新验证码（重新 initialize-player）。
+    /// 服务端验证码约 5 分钟轮换，空闲过期后点 UI 刷新即可，无需重启。
+    /// </summary>
+    public string RefreshVerifyCode()
+    {
+        if (string.IsNullOrEmpty(_localPlayerBattleTag) || _localPlayerLo == 0)
+        {
+            Log("刷新验证码失败：玩家信息尚未就绪");
+            return null;
+        }
+
+        try
+        {
+            var ok = ApiClient.InitializePlayerAsync(_localPlayerBattleTag, _localPlayerHi, _localPlayerLo, _lastKnownMmr)
+                .GetAwaiter().GetResult();
+            if (!ok)
+            {
+                Log("刷新验证码失败：initialize-player 未成功");
+                return null;
+            }
+
+            _verifyCode = ApiClient.VerificationCode ?? "";
+            if (!string.IsNullOrEmpty(_verifyCode))
+            {
+                OnVerifyCodeChanged?.Invoke(_verifyCode);
+                Log($"验证码已刷新: {_verifyCode}");
+            }
+            return _verifyCode;
+        }
+        catch (Exception ex)
+        {
+            Log($"刷新验证码异常: {ex.Message}");
+            return null;
+        }
+    }
+
     public GameMonitorService(Config config, HearthMirrorService hm)
     {
         _config = config;
@@ -103,7 +140,7 @@ public class GameMonitorService : IDisposable
         _hm.OnDisconnected += () => Log("BGSpy 已断开");
         ApiClient.Init(config.ApiBaseUrl);
         GameStore.Init();
-        _league = new LeagueClient(config);
+        _league = new LeagueClient();
         _league.OnStateChanged = OnLeagueStateChanged;
     }
 
@@ -562,7 +599,7 @@ public class GameMonitorService : IDisposable
         Log($"联赛检查中... ({players.Count} 名玩家)");
         _league.OnCheckLeague(
             _localPlayerBattleTag, _localPlayerLo,
-            players, _config.Region, _config.Mode,
+            players,
             () => _phase == GamePhase.Lobby);
     }
 
@@ -630,7 +667,6 @@ public class GameMonitorService : IDisposable
             RatingAfter = 0,
             RatingChange = 0,
             GameUuid = _currentGameUuid,
-            Mode = _config.Mode,
             Timestamp = DateTime.UtcNow.ToString("o"),
         };
         GameStore.Save(record);
@@ -745,7 +781,6 @@ public class GameMonitorService : IDisposable
             RatingAfter = rc?.NewRating ?? 0,
             RatingChange = rc?.Change ?? 0,
             GameUuid = _currentGameUuid,
-            Mode = _config.Mode,
             Timestamp = DateTime.UtcNow.ToString("o"),
         };
         GameStore.Save(record);

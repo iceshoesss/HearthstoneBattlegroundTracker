@@ -8,60 +8,177 @@
         ResizeMode="CanMinimize"
         FontFamily="Microsoft YaHei UI">
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="60"/>
-            <RowDefinition Height="90"/>
-            <RowDefinition Height="56"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition x:Name="SideCol" Width="0"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- Header -->
-        <Border Grid.Row="0" Background="#1a1f2e" BorderBrush="#2a3040" BorderThickness="0,0,0,1">
-            <Grid Margin="16,0">
-                <StackPanel VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock x:Name="PlayerName" Text="等待游戏启动..." FontSize="14" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
-                        <Border x:Name="RegionBadge" Background="#8B7355" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center" Visibility="Collapsed">
-                            <TextBlock x:Name="RegionText" Text="" FontSize="10" FontWeight="Bold" Foreground="White"/>
+        <!-- ═══════════ 主区域 ═══════════ -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="60"/>
+                <RowDefinition Height="90"/>
+                <RowDefinition Height="56"/>
+                <RowDefinition Height="56"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Border Grid.Row="0" Background="#1a1f2e" BorderBrush="#2a3040" BorderThickness="0,0,0,1">
+                <Grid Margin="16,0">
+                    <StackPanel VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="PlayerName" Text="等待游戏启动..." FontSize="14" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                            <Border x:Name="RegionBadge" Background="#8B7355" CornerRadius="4" Padding="6,2" Margin="8,0,0,0" VerticalAlignment="Center" Visibility="Collapsed">
+                                <TextBlock x:Name="RegionText" Text="" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                            </Border>
+                        </StackPanel>
+                        <TextBlock x:Name="PlayerMmr" Text="" FontSize="11" Foreground="#22c55e" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <TextBlock x:Name="StatusLabel" Text="○ 检测中..." HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#64748b"/>
+                </Grid>
+            </Border>
+
+            <!-- Game Status -->
+            <Border Grid.Row="1" Background="#1a1f2e" BorderBrush="#2a3040" BorderThickness="0,0,0,1">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock x:Name="GameIcon" Text="⏳" FontSize="28" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="GameText" Text="等待对局中..." HorizontalAlignment="Center" FontSize="13" Foreground="#94a3b8" Margin="0,4,0,0"/>
+                    <TextBlock x:Name="GameSub" Text="联赛模式已启用" HorizontalAlignment="Center" FontSize="11" Foreground="#64748b" Margin="0,2,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Verification Code -->
+            <Border Grid.Row="2" Background="#1a1f2e" BorderBrush="#2a3040" BorderThickness="0,0,0,1">
+                <Grid Margin="16,0">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="验证码" FontSize="10" Foreground="#64748b"/>
+                        <TextBlock x:Name="VerifyCode" Text="待接入" FontSize="14" FontWeight="Bold" Foreground="#3b82f6" FontFamily="Consolas" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button x:Name="BtnRefreshCode" Content="🔄 刷新" Margin="0,0,8,0"
+                                Background="#2a3040" Foreground="#94a3b8"
+                                BorderBrush="#2a3040" BorderThickness="1" Padding="14,6" Cursor="Hand"
+                                FontSize="11"
+                                Click="BtnRefreshCode_Click"/>
+                        <Button x:Name="BtnCopyCode" Content="📋 复制"
+                                Background="#2a3040" Foreground="#94a3b8"
+                                BorderBrush="#2a3040" BorderThickness="1" Padding="14,6" Cursor="Hand"
+                                FontSize="11"
+                                Click="BtnCopyCode_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Match Actions（与验证码条同高） -->
+            <Border Grid.Row="3" Background="#1a1f2e" BorderBrush="#2a3040" BorderThickness="0,0,0,1">
+                <Grid Margin="16,0">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="联赛匹配" FontSize="10" Foreground="#64748b"/>
+                        <TextBlock x:Name="MatchStatusText" Text="未报名" FontSize="14" FontWeight="Bold" Foreground="#94a3b8" Margin="0,2,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button x:Name="BtnJoinMatch" Content="参赛"
+                                Background="#2563eb" Foreground="White"
+                                BorderBrush="#2563eb" BorderThickness="1" Padding="14,6" Cursor="Hand"
+                                FontSize="11"
+                                Click="BtnJoinMatch_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Log -->
+            <Border Grid.Row="4" Background="#0a0f19">
+                <Grid>
+                    <TextBlock Text="日志" FontSize="10" FontWeight="Bold" Foreground="#64748b" Margin="16,6,0,0"/>
+                    <TextBox x:Name="LogBox" VerticalScrollBarVisibility="Auto" IsReadOnly="True"
+                             Background="#0a0f19" Foreground="#94a3b8" FontFamily="Consolas" FontSize="11"
+                             BorderThickness="0" Margin="0,24,0,0" TextWrapping="Wrap"/>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ═══════════ 右侧：排队 / 确认面板 ═══════════ -->
+        <Border x:Name="SidePanel" Grid.Column="1"
+                Background="#111827" BorderBrush="#2a3040" BorderThickness="1,0,0,0"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="48"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- 侧栏标题 -->
+                <Border Grid.Row="0" Background="#1a1f2e" BorderBrush="#2a3040" BorderThickness="0,0,0,1">
+                    <Grid Margin="14,0">
+                        <TextBlock Text="匹配面板" FontSize="12" FontWeight="Bold" Foreground="#e2e8f0" VerticalAlignment="Center"/>
+                        <Button x:Name="BtnCloseSide" Content="✕" Width="28" Height="28"
+                                HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Background="Transparent" Foreground="#64748b" BorderThickness="0"
+                                Cursor="Hand" FontSize="12"
+                                Click="BtnCloseSide_Click"/>
+                    </Grid>
+                </Border>
+
+                <!-- 内容（排队 / 成组 / 确认，后续填充） -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="14,12">
+                        <!-- 状态卡 -->
+                        <Border Background="#1a1f2e" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock Text="当前状态" FontSize="10" Foreground="#64748b"/>
+                                <TextBlock x:Name="SideStateText" Text="未报名" FontSize="15" FontWeight="Bold" Foreground="#3b82f6" Margin="0,4,0,0"/>
+                                <TextBlock x:Name="SideStateSub" Text="点击左侧「参赛」开始报名" FontSize="11" Foreground="#94a3b8" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 排队进度 -->
+                        <Border Background="#1a1f2e" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="排队进度" FontSize="10" Foreground="#64748b" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="SideQueueCount" Text="— / 8" FontSize="10" Foreground="#64748b" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                </Grid>
+                                <Border Background="#2a3040" CornerRadius="4" Height="6" Margin="0,8,0,0">
+                                    <Border x:Name="SideQueueBar" Background="#2563eb" CornerRadius="4" HorizontalAlignment="Left" Width="0"/>
+                                </Border>
+                                <TextBlock x:Name="SideQueueHint" Text="盲配中，成组后显示同桌名单" FontSize="10" Foreground="#64748b" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 同桌名单 / ready -->
+                        <Border Background="#1a1f2e" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock Text="同桌名单" FontSize="10" Foreground="#64748b"/>
+                                <TextBlock x:Name="SideRosterText" Text="成组后展示" FontSize="11" Foreground="#94a3b8" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 名次确认 -->
+                        <Border Background="#1a1f2e" CornerRadius="8" Padding="12">
+                            <StackPanel>
+                                <TextBlock Text="名次确认" FontSize="10" Foreground="#64748b"/>
+                                <TextBlock x:Name="SideConfirmText" Text="对局结束后在此确认名次" FontSize="11" Foreground="#94a3b8" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
                         </Border>
                     </StackPanel>
-                    <TextBlock x:Name="PlayerMmr" Text="" FontSize="11" Foreground="#22c55e" Margin="0,2,0,0"/>
-                </StackPanel>
-                <TextBlock x:Name="StatusLabel" Text="○ 检测中..." HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#64748b"/>
-            </Grid>
-        </Border>
+                </ScrollViewer>
 
-        <!-- Game Status -->
-        <Border Grid.Row="1" Background="#1a1f2e" BorderBrush="#2a3040" BorderThickness="0,0,0,1">
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock x:Name="GameIcon" Text="⏳" FontSize="28" HorizontalAlignment="Center"/>
-                <TextBlock x:Name="GameText" Text="等待对局中..." HorizontalAlignment="Center" FontSize="13" Foreground="#94a3b8" Margin="0,4,0,0"/>
-                <TextBlock x:Name="GameSub" Text="联赛模式已启用" HorizontalAlignment="Center" FontSize="11" Foreground="#64748b" Margin="0,2,0,0"/>
-            </StackPanel>
-        </Border>
-
-        <!-- Verification Code -->
-        <Border Grid.Row="2" Background="#1a1f2e" BorderBrush="#2a3040" BorderThickness="0,0,0,1">
-            <Grid Margin="16,0">
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="验证码" FontSize="10" Foreground="#64748b"/>
-                    <TextBlock x:Name="VerifyCode" Text="待接入" FontSize="14" FontWeight="Bold" Foreground="#3b82f6" FontFamily="Consolas" Margin="0,2,0,0"/>
-                </StackPanel>
-                <Button x:Name="BtnCopyCode" Content="📋 复制" HorizontalAlignment="Right" VerticalAlignment="Center"
-                        Background="#2a3040" Foreground="#94a3b8"
-                        BorderBrush="#2a3040" BorderThickness="1" Padding="14,6" Cursor="Hand"
-                        FontSize="11"
-                        Click="BtnCopyCode_Click"/>
-            </Grid>
-        </Border>
-
-        <!-- Log -->
-        <Border Grid.Row="3" Background="#0a0f19">
-            <Grid>
-                <TextBlock Text="日志" FontSize="10" FontWeight="Bold" Foreground="#64748b" Margin="16,6,0,0"/>
-                <TextBox x:Name="LogBox" VerticalScrollBarVisibility="Auto" IsReadOnly="True"
-                         Background="#0a0f19" Foreground="#94a3b8" FontFamily="Consolas" FontSize="11"
-                         BorderThickness="0" Margin="0,24,0,0" TextWrapping="Wrap"/>
+                <!-- 底部操作 -->
+                <Border Grid.Row="2" Background="#1a1f2e" BorderBrush="#2a3040" BorderThickness="0,1,0,0" Padding="12,10">
+                    <StackPanel>
+                        <Button x:Name="BtnSidePrimary" Content="参赛报名" Height="34"
+                                Background="#2563eb" Foreground="White" BorderBrush="#2563eb"
+                                BorderThickness="1" Cursor="Hand" FontSize="11"
+                                Click="BtnSidePrimary_Click"/>
+                        <Button x:Name="BtnSideSecondary" Content="取消" Height="30" Margin="0,8,0,0"
+                                Background="#2a3040" Foreground="#94a3b8" BorderBrush="#2a3040"
+                                BorderThickness="1" Cursor="Hand" FontSize="11"
+                                IsEnabled="False"
+                                Click="BtnSideSecondary_Click"/>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
     </Grid>

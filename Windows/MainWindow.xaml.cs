@@ -159,6 +159,115 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void BtnRefreshCode_Click(object sender, RoutedEventArgs e)
+    {
+        if (BtnRefreshCode.IsEnabled == false) return;
+
+        BtnRefreshCode.IsEnabled = false;
+        BtnRefreshCode.Content = "⏳ 刷新中";
+        try
+        {
+            var code = await System.Threading.Tasks.Task.Run(() => _monitor?.RefreshVerifyCode());
+            if (!string.IsNullOrEmpty(code))
+            {
+                VerifyCode.Text = code;
+                BtnRefreshCode.Content = "✅ 已更新";
+            }
+            else
+            {
+                BtnRefreshCode.Content = "❌ 失败";
+            }
+        }
+        catch
+        {
+            BtnRefreshCode.Content = "❌ 失败";
+        }
+
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
+        timer.Tick += (_, _) =>
+        {
+            BtnRefreshCode.Content = "🔄 刷新";
+            BtnRefreshCode.IsEnabled = true;
+            timer.Stop();
+        };
+        timer.Start();
+    }
+
+    // ── 侧栏展开 / 收起 ──────────────────────────────────────
+    private const double SidePanelWidth = 280;
+    private bool _sideOpen;
+    private bool _sideAnimating;
+
+    private void BtnJoinMatch_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleSidePanel(open: !_sideOpen);
+    }
+
+    private void BtnCloseSide_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleSidePanel(open: false);
+    }
+
+    private void ToggleSidePanel(bool open)
+    {
+        if (_sideAnimating || _sideOpen == open) return;
+        _sideAnimating = true;
+        _sideOpen = open;
+
+        // 主按钮文案：展开后变为「收起」
+        BtnJoinMatch.Content = open ? "收起" : "参赛";
+        BtnJoinMatch.Background = open
+            ? new SolidColorBrush(Color.FromRgb(0x2a, 0x30, 0x40))
+            : new SolidColorBrush(Color.FromRgb(0x25, 0x63, 0xeb));
+        BtnJoinMatch.BorderBrush = BtnJoinMatch.Background;
+        BtnJoinMatch.Foreground = open
+            ? new SolidColorBrush(Color.FromRgb(0x94, 0xa3, 0xb8))
+            : Brushes.White;
+
+        if (open)
+        {
+            SidePanel.Visibility = Visibility.Visible;
+            SideCol.Width = new GridLength(SidePanelWidth);
+        }
+
+        var targetWidth = open ? 400 + SidePanelWidth : 400;
+        var anim = new System.Windows.Media.Animation.DoubleAnimation
+        {
+            From = Width,
+            To = targetWidth,
+            Duration = TimeSpan.FromMilliseconds(220),
+            EasingFunction = new System.Windows.Media.Animation.QuadraticEase
+            {
+                EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut
+            }
+        };
+        anim.Completed += (_, _) =>
+        {
+            if (!open)
+            {
+                SideCol.Width = new GridLength(0);
+                SidePanel.Visibility = Visibility.Collapsed;
+            }
+            _sideAnimating = false;
+        };
+        BeginAnimation(WidthProperty, anim);
+    }
+
+    private void BtnSidePrimary_Click(object sender, RoutedEventArgs e)
+    {
+        // TODO: Phase 2 — 接入 WS 报名
+        SideStateText.Text = "排队中";
+        SideStateSub.Text = "报名流程接入后生效";
+        MatchStatusText.Text = "排队中";
+        MatchStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x3b, 0x82, 0xf6));
+        AppendLog("参赛：UI 已就绪，等待接入匹配服务");
+    }
+
+    private void BtnSideSecondary_Click(object sender, RoutedEventArgs e)
+    {
+        // TODO: 取消排队
+    }
+
     private void AppendLog(string msg)
     {
         var timestamp = DateTime.Now.ToString("HH:mm:ss");
