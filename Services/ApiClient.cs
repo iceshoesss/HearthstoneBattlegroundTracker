@@ -18,6 +18,7 @@ public static class ApiClient
 {
     // 配置
     private static string _baseUrl = "";
+    public static string BaseUrl => _baseUrl;
 
     // API Key 编译时写入，不暴露给用户配置
     // 发布前需替换为实际 Key
@@ -530,6 +531,36 @@ public static class ApiClient
             Console.WriteLine($"[API] report-game-stats 异常: {e.Message}");
             return false;
         }
+    }
+
+
+    // ── Phase2：一场一连 — 报名 / 取消 / 名次确认 ──
+
+    public static async Task<string> QueueJoinAsync(string battleTag)
+    {
+        var body = new Dictionary<string, object> { { "battleTag", battleTag } };
+        var (ok, json) = await PostAsync("/api/plugin/queue/join", body);
+        if (!ok) { LastError = json; return ""; }
+        return ExtractJsonString(json, "ticket");
+    }
+
+    public static async Task<bool> QueueLeaveAsync(string ticket)
+    {
+        var body = new Dictionary<string, object> { { "ticket", ticket } };
+        var (ok, json) = await PostAsync("/api/plugin/queue/leave", body);
+        return ok;
+    }
+
+    public static async Task<bool> ConfirmPlacementAsync(string ticket, int placement, bool okConfirm)
+    {
+        var body = new Dictionary<string, object>
+        {
+            { "ticket", ticket },
+            { "placement", placement },
+            { "ok", okConfirm },
+        };
+        var (ok, json) = await PostAsync("/api/plugin/confirm-placement", body);
+        return ok;
     }
 
     // ── HTTP 工具方法 ──
