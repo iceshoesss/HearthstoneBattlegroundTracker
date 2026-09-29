@@ -565,22 +565,22 @@ public partial class MainWindow : Window
                 }
             }
         }
-        else if (type == "table_update")
+        else if (type == "table_update" || type == "roster")
         {
-            var names = TryParseNamedArray(json, "tableNames");
-            var tags = TryParseNamedArray(json, "tableTags");
+            // roster: {type, names[], tags[], count}  table_update: {tableNames, tableTags, ...}
+            var names = type == "roster" ? TryParseNamedArray(json, "names") : TryParseNamedArray(json, "tableNames");
+            var tags = type == "roster" ? TryParseNamedArray(json, "tags") : TryParseNamedArray(json, "tableTags");
             var list = tags.Count >= names.Count && tags.Count > 0 ? tags : names;
-            if (list.Count > 0)
-            {
-                SideRosterText.Text = string.Join("\n", list);
-                SideQueueHint.Text = "同桌名单已更新（含新补入 / 已退出）";
-                SideQueueCount.Text = list.Count + " / 8";
-                SideQueueBar.Width = Math.Min(220.0, 220.0 * list.Count / 8.0);
-            }
+            if (list.Count == 0) list = names;
+            SideRosterText.Text = list.Count > 0 ? string.Join("\n", list) : "（空）";
+            SideQueueHint.Text = "同桌名单已更新（含新补入 / 已退出）";
+            SideQueueCount.Text = list.Count + " / 8";
+            SideQueueBar.Width = Math.Min(220.0, 220.0 * list.Count / 8.0);
             if (SideStateText.Text == "排队中" || SideStateText.Text == "已成组")
             {
                 SideStateText.Text = "已成组";
                 MatchStatusText.Text = "已成组";
+                MatchStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0x22, 0xc5, 0x5e));
             }
         }
         else if (type == "confirm_placement")

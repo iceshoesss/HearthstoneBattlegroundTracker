@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using BattlegroundSpy.Objects;
 using HackF5.UnitySpy;
+using HackF5.UnitySpy.Detail;
 using HackF5.UnitySpy.HearthstoneLib.Detail;
 
 namespace BattlegroundSpy
@@ -1997,6 +1999,717 @@ public sealed class BattlegroundSpyReader : IDisposable
             result.Add((cardId, tags, entityId, zonePos));
         }
         return result;
+    }
+
+    // ═══════════════════════════════════════
+    //  好友房 / 进房探测（诊断用）
+    // ═══════════════════════════════════════
+
+    /// <summary>
+    /// Room probe: scene + PartyManager identity + lobby only.
+    /// full is ignored on purpose (heavy scans hang on some objects).
+    /// </summary>
+    public void DumpRoomProbe(TextWriter w, bool full = true)
+    {
+        if (w == null) w = Console.Out;
+        Console.WriteLine("[room-probe] tick " + DateTime.Now.ToString("HH:mm:ss"));
+        w.WriteLine("=== Room Probe " + DateTime.Now.ToString("HH:mm:ss") + " ===");
+        w.Flush();
+
+        try
+        {
+            var scene = GetSceneMode();
+            w.WriteLine("SceneMode=" + scene);
+            Console.WriteLine("[room-probe] scene=" + scene);
+        }
+        catch (Exception ex)
+        {
+            w.WriteLine("SceneMode: " + ex.Message);
+        }
+        w.Flush();
+
+        Console.WriteLine("[room-probe] party scan...");
+        w.WriteLine("--- PartyManager ---");
+        w.Flush();
+        DumpPartyDeep(w);
+
+        Console.WriteLine("[room-probe] lobby...");
+        w.WriteLine("--- Lobby ---");
+        w.Flush();
+        try
+        {
+            var lobby = GetBattlegroundsLobbyInfo();
+            if (lobby == null) w.WriteLine("  null (not in game)");
+            else
+            {
+                w.WriteLine("  Players=" + lobby.Players.Count + " GameUuid=" + lobby.GameUuid);
+                foreach (var p in lobby.Players)
+                    w.WriteLine("    Lo=" + p.AccountId?.Lo + " name=" + p.Name + " hero=" + p.HeroCardId);
+            }
+        }
+        catch (Exception ex)
+        {
+            w.WriteLine("  lobby: " + ex.Message);
+        }
+        w.WriteLine();
+        w.Flush();
+        Console.WriteLine("[room-probe] tick done");
+    }
+
+    public void DumpRoomProbe() => DumpRoomProbe(Console.Out, full: true);
+
+    private List<string> ListServiceTypeNames()
+    {
+        var result = new List<string>();
+        dynamic builders = _image["Hearthstone.HearthstoneJobs"]?["s_dependencyBuilder"]?["_items"];
+        if (builders == null) return result;
+        dynamic locator = builders[0]?["m_serviceLocator"];
+        if (locator == null) return result;
+        dynamic services = locator["m_services"];
+        if (services == null) return result;
+        dynamic entries = services["_entries"];
+        if (entries == null) return result;
+
+        int size = GetCollectionSize(entries);
+        for (int i = 0; i < size; i++)
+        {
+            try
+            {
+                dynamic e = entries[i];
+                if (e == null) continue;
+                string name = (string)(e["value"]?["<ServiceTypeName>k__BackingField"] ?? e["key"] ?? "");
+                if (!string.IsNullOrEmpty(name))
+                    result.Add(name);
+            }
+            catch { }
+        }
+        return result;
+    }
+
+    private void DumpServiceFields(string serviceName, TextWriter w)
+    {
+        try
+        {
+            dynamic svc = null;
+            try { svc = _hsImage.GetService(serviceName, true); } catch { }
+            if (svc == null)
+            {
+                try { svc = _image[serviceName]?["s_instance"]; } catch { }
+            }
+            if (svc == null)
+            {
+                w.WriteLine("  " + serviceName + ": <null>");
+                return;
+            }
+            w.WriteLine("  " + serviceName + ":");
+            DumpFieldsShallow(svc, "      ", w);
+        }
+        catch (Exception ex)
+        {
+            w.WriteLine("  " + serviceName + ": ERROR " + ex.Message);
+        }
+    }
+
+    /// <summary>深挖 PartyManager：m_partyData / m_pendingParty / 成员列表</summary>
+    private void DumpPartyDeep(TextWriter w)
+    {
+        Console.WriteLine("[room-probe] DumpPartyDeep enter");
+        w.WriteLine("--- PartyManager ---");
+        w.Flush();
+
+        Action<string, Action> step = (label, body) =>
+        {
+            Console.WriteLine("[room-probe] " + label);
+            w.WriteLine("  [" + label + "]");
+            w.Flush();
+            try
+            {
+                var t = System.Threading.Tasks.Task.Run(body);
+                if (!t.Wait(2000))
+                {
+                    w.WriteLine("      TIMEOUT");
+                    Console.WriteLine("[room-probe] " + label + " TIMEOUT");
+                }
+            }
+            catch (Exception ex)
+            {
+                w.WriteLine("      ERR " + ex.GetBaseException().Message);
+            }
+            w.Flush();
+        };
+
+        dynamic pm = null;
+        step("get PartyManager", () => { pm = _hsImage.GetService("PartyManager", false) ?? _image["PartyManager"]?["s_instance"]; });
+
+        if (pm == null)
+        {
+            w.WriteLine("  PartyManager null");
+            w.Flush();
+            Console.WriteLine("[room-probe] DumpPartyDeep done (null pm)");
+            return;
+        }
+
+        step("PartyData scalars", () =>
+        {
+            dynamic pd = null;
+            try { pd = pm["m_partyData", false]; } catch { }
+            if (pd == null) { w.WriteLine("      m_partyData=null"); return; }
+            foreach (var name in new[] { "m_format", "m_inviteId", "m_private", "m_scenarioId", "m_season", "m_type", "m_partyId" })
+            {
+                try
+                {
+                    object val = pd[name, false];
+                    if (val == null) w.WriteLine("      " + name + " = null");
+                    else if (val is string || val.GetType().IsPrimitive || val.GetType().IsEnum)
+                        w.WriteLine("      " + name + " = " + FormatShallow(val));
+                    else w.WriteLine("      " + name + " = (" + val.GetType().Name + ")");
+                }
+                catch { w.WriteLine("      " + name + " = <fail>"); }
+            }
+        });
+
+        step("invite dialog", () =>
+        {
+            dynamic dlg = null;
+            try { dlg = pm["m_inviteDialog", false]; } catch { }
+            if (dlg == null) { w.WriteLine("      none"); return; }
+            w.WriteLine("      shown=" + FormatShallow(dlg["m_shown", false]));
+            object cn = null;
+            try { cn = dlg["m_challengerName", false]; } catch { }
+            if (cn == null) { w.WriteLine("      challenger=null"); return; }
+            // UI string / text 组件：常见 m_Text / text
+            dynamic c = cn;
+            foreach (var fn in new[] { "m_Text", "m_text", "text", "m_string", "m_value", "m_name" })
+            {
+                try
+                {
+                    object sv = c[fn, false];
+                    if (sv is string s && s.Length > 0)
+                    {
+                        w.WriteLine("      challengerName." + fn + " = \"" + s + "\"");
+                        return;
+                    }
+                }
+                catch { }
+            }
+            w.WriteLine("      challengerName type=" + cn.GetType().Name);
+            ScanFieldsSafe(cn, "      ", w, 0);
+        });
+
+        step("pendingParty", () =>
+        {
+            object pp = null;
+            try { pp = pm["m_pendingParty", false]; } catch { }
+            if (pp == null) { w.WriteLine("      null"); return; }
+            ScanFieldsSafe(pp, "      ", w, 0);
+        });
+
+        step("presence gameAccounts (max 4)", () =>
+        {
+            dynamic presence = null;
+            try { presence = _hsImage.GetService("BnetPresenceMgr", false); } catch { }
+            if (presence == null) { try { presence = _image["BnetPresenceMgr"]?["s_instance"]; } catch { } }
+            if (presence == null) { w.WriteLine("      presence null"); return; }
+
+            object gas = null;
+            try { gas = presence["m_gameAccounts", false]; } catch { }
+            if (gas == null) { w.WriteLine("      m_gameAccounts null"); return; }
+
+            // 值表最多 4 个，每个只读 name + accountId
+            try
+            {
+                dynamic d = gas;
+                object vs = null;
+                try { vs = d["valueSlots", false]; } catch { }
+                object ks = null;
+                try { ks = d["keySlots", false]; } catch { }
+                object items = null;
+                try { items = d["_items", false]; } catch { }
+
+                if (vs != null)
+                {
+                    dynamic dvs = vs;
+                    int n = Math.Min(GetCollectionSize(vs), 4);
+                    for (int i = 0; i < n; i++)
+                    {
+                        object acc = null;
+                        try { acc = dvs[i]; } catch { continue; }
+                        if (acc == null) continue;
+                        w.WriteLine("      acc[" + i + "]");
+                        DumpOneAccount(acc, "        ", w);
+                    }
+                    return;
+                }
+                if (items != null)
+                {
+                    dynamic ditems = items;
+                    int n = Math.Min(GetCollectionSize(items), 4);
+                    for (int i = 0; i < n; i++)
+                    {
+                        object acc = null;
+                        try { acc = ditems[i]; } catch { continue; }
+                        if (acc == null) continue;
+                        w.WriteLine("      acc[" + i + "]");
+                        DumpOneAccount(acc, "        ", w);
+                    }
+                    return;
+                }
+                w.WriteLine("      (no slots/items) type=" + gas.GetType().Name);
+            }
+            catch (Exception ex) { w.WriteLine("      gas err " + ex.Message); }
+        });
+
+        w.Flush();
+        Console.WriteLine("[room-probe] DumpPartyDeep done");
+    }
+
+    /// <summary>单个 gameAccount：只读名字与 account id</summary>
+    private static void DumpOneAccount(object acc, string indent, TextWriter w)
+    {
+        try
+        {
+            dynamic a = acc;
+            foreach (var name in new[] { "m_name", "m_fullName", "m_battleTag" })
+            {
+                try
+                {
+                    object v = a[name, false];
+                    if (v is string s) { w.WriteLine(indent + name + " = \"" + s + "\""); }
+                }
+                catch { }
+            }
+            object idObj = null;
+            try { idObj = a["m_gameAccountId", false]; } catch { }
+            if (idObj == null) { try { idObj = a["m_accountId", false]; } catch { } }
+            if (idObj == null) { try { idObj = a["m_id", false]; } catch { } }
+            if (idObj == null) { w.WriteLine(indent + "(no id field)"); return; }
+            try
+            {
+                dynamic id = idObj;
+                object lo = null, hi = null;
+                try { lo = id["low_", false]; } catch { }
+                try { hi = id["high_", false]; } catch { }
+                if (lo == null) { try { lo = id["low", false]; } catch { } }
+                if (hi == null) { try { hi = id["high", false]; } catch { } }
+                if (lo != null || hi != null)
+                    w.WriteLine(indent + "accountId lo=" + FormatShallow(lo) + " hi=" + FormatShallow(hi));
+                else
+                {
+                    // EntityId backing field
+                    try
+                    {
+                        dynamic ent = id["<EntityId>k__BackingField", false];
+                        if (ent != null)
+                        {
+                            w.WriteLine(indent + "entityId lo=" + FormatShallow(ent["low_", false]) + " hi=" + FormatShallow(ent["high_", false]));
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { w.WriteLine(indent + "id type=" + idObj.GetType().Name); }
+        }
+        catch (Exception ex) { w.WriteLine(indent + "acc err " + ex.Message); }
+    }
+
+    private static void ScanFieldsSafe(object obj, string indent, TextWriter w, int level)
+    {
+        if (obj == null) return;
+        try
+        {
+            dynamic d = obj;
+            var td = (TypeDefinition)d.TypeDefinition;
+            w.WriteLine(indent + "class " + (td.FullName ?? td.Name));
+            var fields = td.Fields;
+            if (fields == null) return;
+            int n = 0;
+            foreach (var f in fields)
+            {
+                if (f == null) continue;
+                if (n++ > 30) { w.WriteLine(indent + "...(field cap)"); break; }
+                string name = f.Name ?? "?";
+                // 跳过事件/监听器，避免无意义且可能很重的对象
+                if (name.IndexOf("Listener", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("Handler", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.StartsWith("On", StringComparison.Ordinal))
+                {
+                    w.WriteLine(indent + name + " = (skipped)");
+                    continue;
+                }
+
+                try
+                {
+                    object val = d[name, false];
+                    if (val == null) { w.WriteLine(indent + name + " = null"); continue; }
+                    if (val is string || val.GetType().IsPrimitive || val.GetType().IsEnum)
+                        w.WriteLine(indent + name + " = " + FormatShallow(val));
+                    else
+                        w.WriteLine(indent + name + " = (" + val.GetType().Name + ")");
+                }
+                catch
+                {
+                    w.WriteLine(indent + name + " = <read-fail>");
+                }
+            }
+            w.Flush();
+        }
+        catch (Exception ex)
+        {
+            w.WriteLine(indent + "(scan failed: " + ex.Message + ")");
+        }
+    }
+
+    /// <summary>浅层收集身份字段：只扫 2 层，集合最多 12 项</summary>
+    private static void CollectIdentitySafe(object obj, string indent, int depth, int maxDepth, TextWriter w, ref int hits)
+    {
+        if (obj == null || depth > maxDepth) return;
+
+        try
+        {
+            // 数组：最多 12 项
+            if (obj is Array arr)
+            {
+                int show = Math.Min(arr.Length, 6);
+                for (int i = 0; i < show; i++)
+                    CollectIdentitySafe(arr.GetValue(i), indent + "  ", depth + 1, maxDepth, w, ref hits);
+                return;
+            }
+
+            dynamic d = obj;
+
+            // 列表 _items
+            try
+            {
+                object items = d["_items", false];
+                if (items is Array a2)
+                {
+                    int show = Math.Min(a2.Length, 6);
+                    for (int i = 0; i < show; i++)
+                        CollectIdentitySafe(a2.GetValue(i), indent + "  ", depth + 1, maxDepth, w, ref hits);
+                    return;
+                }
+            }
+            catch { }
+
+            // 字典 keySlots/valueSlots
+            try
+            {
+                object ks = d["keySlots", false];
+                object vs = d["valueSlots", false];
+                if (ks != null && vs != null)
+                {
+                    dynamic dks = ks; dynamic dvs = vs;
+                    int n = Math.Min(GetCollectionSize(dks), 6);
+                    for (int i = 0; i < n; i++)
+                    {
+                        try { CollectIdentitySafe(dvs[i], indent + "  ", depth + 1, maxDepth, w, ref hits); }
+                        catch { }
+                    }
+                    return;
+                }
+            }
+            catch { }
+
+            var td = (TypeDefinition)d.TypeDefinition;
+            var fields = td.Fields;
+            if (fields == null) return;
+            int fn = 0;
+            foreach (var f in fields)
+            {
+                if (f == null) continue;
+                if (fn++ > 25) break;
+                string name = f.Name ?? "";
+                object val;
+                try { val = d[name, false]; } catch { continue; }
+                if (val == null) continue;
+
+                bool identityName =
+                    name.IndexOf("name", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("tag", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("battle", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("account", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("player", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("member", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.EndsWith("Id", StringComparison.OrdinalIgnoreCase)
+                    || name.EndsWith("Lo", StringComparison.OrdinalIgnoreCase)
+                    || name.EndsWith("Hi", StringComparison.OrdinalIgnoreCase);
+
+                if (identityName && (val is string || val.GetType().IsPrimitive || val.GetType().IsEnum))
+                {
+                    w.WriteLine(indent + name + " = " + FormatShallow(val));
+                    hits++;
+                }
+                else if (!(val is string) && !val.GetType().IsPrimitive && depth < maxDepth)
+                {
+                    // 引用类型只在浅层继续，且跳过 Listener/Handler
+                    if (name.IndexOf("Listener", StringComparison.OrdinalIgnoreCase) >= 0
+                        || name.IndexOf("Handler", StringComparison.OrdinalIgnoreCase) >= 0)
+                        continue;
+                    CollectIdentitySafe(val, indent + "  ", depth + 1, maxDepth, w, ref hits);
+                }
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>只收集名字/战网/账号类字段，回答「进来的是谁」</summary>
+    private static void CollectIdentity(object obj, string indent, int depth, int maxDepth, TextWriter w, ref int hits)
+    {
+        if (obj == null || depth > maxDepth) return;
+
+        try
+        {
+            if (obj is Array arr)
+            {
+                for (int i = 0; i < arr.Length && i < 16; i++)
+                    CollectIdentity(arr.GetValue(i), indent + "  ", depth + 1, maxDepth, w, ref hits);
+                return;
+            }
+
+            dynamic d = obj;
+            object items = null, ks = null, vs = null;
+            try { items = d["_items", false]; } catch { }
+            try { ks = d["keySlots", false]; } catch { }
+            try { vs = d["valueSlots", false]; } catch { }
+
+            if (items != null)
+            {
+                for (int i = 0; i < 16; i++)
+                {
+                    try { CollectIdentity(d[i], indent + "  ", depth + 1, maxDepth, w, ref hits); }
+                    catch { break; }
+                }
+                return;
+            }
+            if (ks != null && vs != null)
+            {
+                dynamic dks = ks; dynamic dvs = vs;
+                int n = GetCollectionSize(dks);
+                for (int i = 0; i < n && i < 16; i++)
+                {
+                    try { CollectIdentity(dvs[i], indent + "  ", depth + 1, maxDepth, w, ref hits); }
+                    catch { }
+                }
+                return;
+            }
+
+            var td = (TypeDefinition)d.TypeDefinition;
+            var fields = td.Fields;
+            if (fields == null) return;
+            foreach (var f in fields)
+            {
+                if (f == null) continue;
+                string name = f.Name ?? "";
+                object val;
+                try { val = d[name, false]; } catch { continue; }
+
+                bool identityName =
+                    name.IndexOf("name", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("tag", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("battle", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("account", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("player", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.IndexOf("member", StringComparison.OrdinalIgnoreCase) >= 0
+                    || name.EndsWith("Id", StringComparison.OrdinalIgnoreCase)
+                    || name.EndsWith("Lo", StringComparison.OrdinalIgnoreCase)
+                    || name.EndsWith("Hi", StringComparison.OrdinalIgnoreCase);
+
+                if (val == null) continue;
+
+                if (identityName && (val is string || val.GetType().IsPrimitive || val.GetType().IsEnum))
+                {
+                    w.WriteLine(indent + name + " = " + FormatShallow(val));
+                    hits++;
+                }
+                else if (!(val is string) && !val.GetType().IsPrimitive)
+                {
+                    CollectIdentity(val, indent + "  ", depth + 1, maxDepth, w, ref hits);
+                }
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>递归浅/中层 dump：字段名 + 标量；集合展开前几项</summary>
+    private static void DumpNode(object obj, string indent, int depth, int maxDepth, TextWriter w = null)
+    {
+        if (w == null) w = Console.Out;
+        if (obj == null) { w.WriteLine(indent + "null"); return; }
+        if (depth > maxDepth) { w.WriteLine(indent + "..."); return; }
+
+        string typeName = obj.GetType().Name;
+
+        // 数组 / 列表
+        if (obj is Array arr)
+        {
+            w.WriteLine($"{indent}{typeName}[] len={arr.Length}");
+            int show = Math.Min(arr.Length, 6);
+            for (int i = 0; i < show; i++)
+            {
+                w.WriteLine($"{indent}[{i}]");
+                DumpNode(arr.GetValue(i), indent + "  ", depth + 1, maxDepth, w);
+            }
+            if (arr.Length > show) w.WriteLine($"{indent}... +{arr.Length - show} more");
+            return;
+        }
+
+        // 看起来像列表：有 _items / _size
+        try
+        {
+            dynamic d = obj;
+            object items = null, sizeObj = null;
+            try { items = d["_items", false]; } catch { }
+            try { sizeObj = d["_size", false]; } catch { }
+            if (items != null || sizeObj != null)
+            {
+                int size = sizeObj is int si ? si : (items is Array a2 ? a2.Length : GetCollectionSize(d));
+                w.WriteLine($"{indent}{typeName} list size≈{size}");
+                int show = Math.Min(size, 12);
+                for (int i = 0; i < show; i++)
+                {
+                    try
+                    {
+                        dynamic item = d[i];
+                        w.WriteLine($"{indent}[{i}]");
+                        DumpNode(item, indent + "  ", depth + 1, maxDepth, w);
+                    }
+                    catch (Exception ex) { w.WriteLine($"{indent}[{i}] err {ex.Message}"); }
+                }
+                if (size > show) w.WriteLine($"{indent}... +{size - show} more");
+                return;
+            }
+        }
+        catch { }
+
+        // 字典：keySlots/valueSlots
+        try
+        {
+            dynamic d = obj;
+            object ks = null, vs = null;
+            try { ks = d["keySlots", false]; } catch { }
+            try { vs = d["valueSlots", false]; } catch { }
+            if (ks != null && vs != null)
+            {
+                int count = GetCollectionSize(ks);
+                w.WriteLine($"{indent}{typeName} map count≈{count}");
+                int show = Math.Min(count, 12);
+                for (int i = 0; i < show; i++)
+                {
+                    try
+                    {
+                        dynamic dks = ks;
+                        dynamic dvs = vs;
+                        w.WriteLine($"{indent}key[{i}]={FormatShallow(dks[i])}");
+                        w.WriteLine($"{indent}value[{i}]:");
+                        DumpNode(dvs[i], indent + "  ", depth + 1, maxDepth, w);
+                    }
+                    catch (Exception ex) { w.WriteLine($"{indent}[{i}] err {ex.Message}"); }
+                }
+                return;
+            }
+        }
+        catch { }
+
+        // 普通对象：打印字段
+        try
+        {
+            var td = (TypeDefinition)((dynamic)obj).TypeDefinition;
+            w.WriteLine($"{indent}class {td.FullName ?? td.Name}");
+            var fields = td.Fields;
+            if (fields == null) return;
+            int n = 0;
+            foreach (var f in fields)
+            {
+                if (f == null) continue;
+                if (n++ > 40) { w.WriteLine(indent + "..."); break; }
+                object val = null;
+                string valText;
+                try
+                {
+                    val = ((dynamic)obj)[f.Name, false];
+                    // 标量直接打；引用类型展开一层
+                    if (val == null || val is string || val.GetType().IsPrimitive || val.GetType().IsEnum)
+                        valText = FormatShallow(val);
+                    else
+                    {
+                        w.WriteLine($"{indent}{f.Name} = ({val.GetType().Name})");
+                        if (depth + 1 <= maxDepth)
+                            DumpNode(val, indent + "  ", depth + 1, maxDepth, w);
+                        continue;
+                    }
+                }
+                catch { valText = "<read-fail>"; }
+                w.WriteLine($"{indent}{f.Name} = {valText}");
+            }
+        }
+        catch (Exception ex)
+        {
+            w.WriteLine($"{indent}(dump node failed: {ex.Message}) → {FormatShallow(obj)}");
+        }
+    }
+
+    /// <summary>浅层打印实例字段名与标量/短字符串值（引用类型只标类型名）</summary>
+    private static void DumpFieldsShallow(dynamic inst, string indent, TextWriter w = null)
+    {
+        if (w == null) w = Console.Out;
+        try
+        {
+            var td = (HackF5.UnitySpy.Detail.TypeDefinition)inst.TypeDefinition;
+            w.WriteLine($"{indent}class {td.FullName ?? td.Name}");
+            var fields = td.Fields;
+            if (fields == null) return;
+            int n = 0;
+            foreach (var f in fields)
+            {
+                if (f == null) continue;
+                if (n++ > 50) { w.WriteLine($"{indent}..."); break; }
+                string name = f.Name ?? "?";
+                object val = null;
+                string valText = "<err>";
+                try
+                {
+                    val = inst[name, false];
+                    valText = FormatShallow(val);
+                }
+                catch { valText = "<read-fail>"; }
+                w.WriteLine($"{indent}{name} = {valText}");
+            }
+        }
+        catch (Exception ex)
+        {
+            w.WriteLine($"{indent}(shallow dump failed: {ex.Message})");
+        }
+    }
+
+    private static string FormatShallow(object val)
+    {
+        if (val == null) return "null";
+        if (val is string s)
+        {
+            if (s.Length > 60) s = s.Substring(0, 60) + "...";
+            return "\"" + s + "\"";
+        }
+        if (val is bool || val is int || val is long || val is uint || val is ulong
+            || val is short || val is byte || val is float || val is double)
+            return val.ToString();
+
+        // 引用对象 / 数组：只给类型与大致长度线索
+        try
+        {
+            dynamic d = val;
+            var t = val.GetType().Name;
+            if (t.Contains("[]") || t.Contains("List") || t.Contains("Dictionary")
+                || t.Contains("Map") || t.Contains("Collection"))
+            {
+                int c = GetCollectionSize(d);
+                return $"{t} (count≈{c})";
+            }
+            return t;
+        }
+        catch
+        {
+            return val.GetType().Name;
+        }
     }
 
     public void Dispose()

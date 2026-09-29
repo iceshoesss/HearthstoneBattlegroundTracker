@@ -11,6 +11,18 @@ class Program
     static void Main(string[] args)
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+        // 用法:
+        //   dotnet run --project BattlegroundSpy.Test -c Release
+        //   dotnet run --project BattlegroundSpy.Test -c Release -- room        # 单次房间探测
+        //   dotnet run --project BattlegroundSpy.Test -c Release -- room 3      # 每 3 秒循环
+        var mode = args.Length > 0 ? args[0].Trim().ToLowerInvariant() : "";
+        if (mode == "room" || mode == "probe")
+        {
+            RunRoomProbe(args);
+            return;
+        }
+
         Console.WriteLine("=== BattlegroundSpy 对手识别测试 ===\n");
 
         try
@@ -118,6 +130,76 @@ class Program
             Console.WriteLine(ex.StackTrace);
         }
 
+        Console.WriteLine("\n按回车键退出...");
+        Console.ReadLine();
+    }
+
+    /// <summary>
+    /// 好友房进人探测：开房后循环 dump，对比人数/字段变化。
+    /// </summary>
+    /// <summary>
+    /// 好友房探测：完整输出写入 room_probe_*.log，控制台只打摘要。
+    /// 用法: room 3   （每 3 秒采样；先空房跑几轮，再拉 1 个好友对比）
+    /// </summary>
+    static void RunRoomProbe(string[] args)
+    {
+        int intervalSec = 3;
+        if (args.Length > 1 && int.TryParse(args[1], out var iv) && iv > 0)
+            intervalSec = iv;
+
+        var logPath = System.IO.Path.Combine(
+            System.IO.Directory.GetCurrentDirectory(),
+            "room_probe_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".log");
+
+        using (var fs = new System.IO.StreamWriter(logPath, append: false, System.Text.Encoding.UTF8) { AutoFlush = true })
+        {
+            Console.WriteLine("=== 好友房 / 进房探测 ===");
+            Console.WriteLine("日志文件: " + logPath);
+            Console.WriteLine("间隔: " + intervalSec + "s。先空房采几轮，再拉 1 个好友，Ctrl+C 结束。");
+            fs.WriteLine("# room probe log " + DateTime.Now.ToString("o"));
+            fs.WriteLine("# goal: detect who joined friendly room (PartyManager identity)");
+            fs.WriteLine("# interval_sec=" + intervalSec);
+            fs.WriteLine();
+
+            try
+            {
+                using var reader = new BattlegroundSpyReader();
+                int round = 0;
+                while (true)
+                {
+                    round++;
+                    fs.WriteLine("\n########## Round " + round + " " + DateTime.Now.ToString("HH:mm:ss") + " ##########");
+                    try
+                    {
+                        bool full = round == 1;
+                        reader.DumpRoomProbe(fs, full);
+                    }
+                    catch (Exception ex)
+                    {
+                        fs.WriteLine("probe error: " + ex.Message);
+                        Console.WriteLine("probe error: " + ex.Message);
+                    }
+
+                    // 控制台一行摘要
+                    try
+                    {
+                        var scene = reader.GetSceneMode();
+                        Console.WriteLine("[" + DateTime.Now.ToString("HH:mm:ss") + "] round=" + round + " scene=" + scene + " → 见 log [identity hits]");
+                    }
+                    catch { }
+
+                    System.Threading.Thread.Sleep(intervalSec * 1000);
+                }
+            }
+            catch (Exception ex)
+            {
+                fs.WriteLine("ERROR: " + ex);
+                Console.WriteLine("ERROR: " + ex.Message);
+                Console.WriteLine("日志已写: " + logPath);
+            }
+        }
+
+        Console.WriteLine("日志: " + logPath);
         Console.WriteLine("\n按回车键退出...");
         Console.ReadLine();
     }
