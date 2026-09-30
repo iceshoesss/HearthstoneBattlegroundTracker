@@ -30,7 +30,11 @@ public static class ApiClient
 
     // API Key 编译时写入，不暴露给用户配置
     // 发布前需替换为实际 Key
+    #if DEBUG
     private const string ApiKey = "";
+#else
+    private const string ApiKey = "wangbadanandeluoni123";
+#endif
 
     private static string _pluginVersion = "0.7.0"; // 服务端兼容版本，LeagueTool 实际版本另算
 
