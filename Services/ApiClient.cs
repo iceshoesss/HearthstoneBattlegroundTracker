@@ -171,8 +171,20 @@ public static class ApiClient
 
         try
         {
-            var (ok, json) = await PostAsync("/api/plugin/check-league", body);
-            if (!ok) return null; // HTTP 错误，调用方可重试
+            // 主通道：match WS（一场一连）；失败退回 HTTP
+            string json = null;
+            var ws = MatchSessionClient.Active;
+            if (ws != null && ws.IsConnected)
+            {
+                json = await ws.RequestAsync("check-league", body, 10000);
+                if (json != null) Console.WriteLine("[API] check-league 走 WS 成功");
+            }
+            if (json == null)
+            {
+                var (ok, hjson) = await PostAsync("/api/plugin/check-league", body);
+                if (!ok) return null; // HTTP 错误，调用方可重试
+                json = hjson;
+            }
 
             // 解析响应
             // 无论 isLeague 结果如何，都提取 verificationCode
@@ -297,16 +309,28 @@ public static class ApiClient
         {
             try
             {
-                var (ok, json) = await PostAsync("/api/plugin/update-placement", body);
-                if (!ok)
+                // 主通道 WS，失败退回 HTTP
+                string json = null;
+                var ws = MatchSessionClient.Active;
+                if (ws != null && ws.IsConnected)
                 {
-                    if (attempt < 3)
+                    json = await ws.RequestAsync("update-placement", body, 12000);
+                    if (json != null) Console.WriteLine("[API] update-placement 走 WS 成功");
+                }
+                if (json == null)
+                {
+                    var (ok, hjson) = await PostAsync("/api/plugin/update-placement", body);
+                    if (!ok)
                     {
-                        Console.WriteLine($"[API] update-placement 失败，第 {attempt} 次重试...");
-                        await Task.Delay(2000);
-                        continue;
+                        if (attempt < 3)
+                        {
+                            Console.WriteLine($"[API] update-placement 失败，第 {attempt} 次重试...");
+                            await Task.Delay(2000);
+                            continue;
+                        }
+                        return false;
                     }
-                    return false;
+                    json = hjson;
                 }
 
                 var finalized = ExtractJsonBool(json, "finalized");
@@ -379,8 +403,19 @@ public static class ApiClient
 
         try
         {
-            var (ok, json) = await PostAsync("/api/plugin/check-league", body);
-            if (!ok) return null;
+            string json = null;
+            var ws = MatchSessionClient.Active;
+            if (ws != null && ws.IsConnected)
+            {
+                json = await ws.RequestAsync("check-league", body, 10000);
+                if (json != null) Console.WriteLine("[API] check-league(constructed) 走 WS 成功");
+            }
+            if (json == null)
+            {
+                var (ok, hjson) = await PostAsync("/api/plugin/check-league", body);
+                if (!ok) return null;
+                json = hjson;
+            }
 
             var vc = ExtractJsonString(json, "verificationCode");
             if (!string.IsNullOrEmpty(vc))
@@ -453,8 +488,19 @@ public static class ApiClient
         {
             try
             {
-                var (ok, json) = await PostAsync("/api/plugin/update-placement", body);
-                if (ok)
+                string json = null;
+                var ws = MatchSessionClient.Active;
+                if (ws != null && ws.IsConnected)
+                {
+                    json = await ws.RequestAsync("update-placement", body, 12000);
+                    if (json != null) Console.WriteLine("[API] update-placement(constructed) 走 WS 成功");
+                }
+                if (json == null)
+                {
+                    var (ok, hjson) = await PostAsync("/api/plugin/update-placement", body);
+                    if (ok) json = hjson;
+                }
+                if (json != null)
                 {
                     Console.WriteLine($"[API] ✅ 双方结果已上传: 本机={localPlacement} 对手={oppPlacement}");
                     return true;
