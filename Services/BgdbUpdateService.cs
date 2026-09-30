@@ -13,7 +13,8 @@ namespace HBT.Services
 {
 
 /// <summary>
-/// BattlegroundDB 自动更新服务
+/// BattlegroundDB（卡牌库）自动更新
+/// 下载新 DLL → 退出本程序 → 批处理替换 → 再启动
 /// </summary>
 public class BgdbUpdateService
 {
@@ -22,28 +23,33 @@ public class BgdbUpdateService
 
     static BgdbUpdateService()
     {
-        // 启用 TLS 1.2（hsbg.cards 需要）
         System.Net.ServicePointManager.SecurityProtocol |= System.Net.SecurityProtocolType.Tls12;
-        _http = new HttpClient();
+        _http = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
+        try { _http.DefaultRequestHeaders.UserAgent.ParseAdd("HBT-BgdbUpdate/1.0"); } catch { }
     }
 
-    private static string DllDir => Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-    private static string DllPath => Path.Combine(DllDir, "BattlegroundDB.dll");
-    private static string NewDllPath => DllPath + ".new";
-    private static string UpdaterBat => Path.Combine(DllDir, "_update_bgdb.bat");
+    private static string ExeDir =>
+        Path.GetDirectoryName(Process.GetCurrentProcess().MainModule?.FileName ?? Assembly.GetExecutingAssembly().Location);
 
-    /// <summary>检查是否有待应用的更新（启动时调用）</summary>
+    private static string ExePath =>
+        Process.GetCurrentProcess().MainModule?.FileName
+        ?? Path.Combine(ExeDir ?? ".", "HearthstoneBattlegroundTracker.exe");
+
+    private static string DllPath => Path.Combine(ExeDir, "BattlegroundDB.dll");
+    private static string NewDllPath => DllPath + ".new";
+    private static string OldDllPath => DllPath + ".old";
+    private static string UpdaterBat => Path.Combine(ExeDir, "_update_bgdb.bat");
+
     public static bool HasPendingUpdate => File.Exists(NewDllPath);
 
-    /// <summary>检查并提示更新（启动后异步调用）</summary>
+    /// <summary>启动后异步检查并提示更新</summary>
     public static async Task CheckAndPromptAsync()
     {
         try
         {
-            // 有待应用的更新，不重复检查
             if (HasPendingUpdate)
             {
-                Console.WriteLine("[BgdbUpdate] 检测到 .new 文件，跳过检查");
+                Console.WriteLine("[BgdbUpdate] 已有 .new 待应用，跳过检查");
                 return;
             }
 
@@ -52,56 +58,95 @@ public class BgdbUpdateService
 
             Console.WriteLine($"[BgdbUpdate] 版本比较: 本地='{currentVersion}' vs 最新='{latestVersion}'");
 
-            if (string.IsNullOrEmpty(latestVersion) || currentVersion == latestVersion)
+            if (string.IsNullOrEmpty(latestVersion))
             {
-                Console.WriteLine("[BgdbUpdate] 版本相同或无法获取最新版本，跳过");
+                Console.WriteLine("[BgdbUpdate] 无法获取最新版本，跳过");
+                return;
+            }
+            // 本地版本读不到时仍允许更新；相同则跳过
+            if (!string.IsNullOrEmpty(currentVersion) && currentVersion == latestVersion)
+            {
+                Console.WriteLine("[BgdbUpdate] 已是最新版本");
                 return;
             }
 
-            Console.WriteLine($"[BgdbUpdate] 发现新版本: {currentVersion} → {latestVersion}");
+            Console.WriteLine($"[BgdbUpdate] 发现新版本: {currentVersion ?? "(未知)"} → {latestVersion}");
 
-            // 弹窗提示
             var result = MessageBox.Show(
-                $"BattlegroundDB 有新版本可用！\n\n当前版本: {currentVersion}\n最新版本: {latestVersion}\n\n点击「是」立即更新，点击「否」跳过。",
+                $"BattlegroundDB 卡牌库有新版本！\n\n当前: {currentVersion ?? "(未知)"}\n最新: {latestVersion}\n\n「是」立即更新并重启工具，「否」稍后再说。",
                 "发现新版本",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Information);
 
-            if (result == MessageBoxResult.Yes)
-            {
-                // 下载新版本
-                var bytes = await _http.GetByteArrayAsync($"{ApiBaseUrl}/download");
-                File.WriteAllBytes(NewDllPath, bytes);
+            if (result != MessageBoxResult.Yes) return;
 
-                // 创建批处理：等 HBT 退出后替换 DLL、重启 HBT
-                var exePath = Assembly.GetExecutingAssembly().Location;
-                var bat = $@"
-@echo off
-timeout /t 2 /nobreak > nul
-ren ""{DllPath}"" BattlegroundDB.dll.old
-ren ""{NewDllPath}"" BattlegroundDB.dll
-start """" ""{exePath}""
-timeout /t 3 /nobreak > nul
-del ""{DllPath}.old""
-del ""%~f0""
+            Console.WriteLine("[BgdbUpdate] 开始下载…");
+            var bytes = await _http.GetByteArrayAsync($"{ApiBaseUrl}/download");
+            if (bytes == null || bytes.Length < 1000)
+                throw new Exception("下载内容过小，可能失败");
+            File.WriteAllBytes(NewDllPath, bytes);
+            Console.WriteLine($"[BgdbUpdate] 已下载 {bytes.Length} 字节 → {NewDllPath}");
+
+            // 批处理：等进程真正退出 → 替换 DLL → 再启动（HBT_UPDATING=1 避免「已在运行」）
+            var pid = Process.GetCurrentProcess().Id;
+            var bat = $@"@echo off
+setlocal
+set HBT_UPDATING=1
+set EXE=""{ExePath}""
+set DLL=""{DllPath}""
+set NEW=""{NewDllPath}""
+set OLD=""{OldDllPath}""
+
+rem 等待本进程退出（最多 40 秒）
+set /a _w=0
+:waitloop
+tasklist /fi ""PID eq {pid}"" 2>nul | find ""{pid}"" >nul
+if errorlevel 1 goto swap
+timeout /t 1 /nobreak >nul
+set /a _w+=1
+if %_w% lss 40 goto waitloop
+
+:swap
+rem 再等一小段，确保句柄/互斥体释放
+timeout /t 2 /nobreak >nul
+
+if exist %OLD% del /f /q %OLD%
+if exist %DLL% ren %DLL% BattlegroundDB.dll.old
+if not exist %DLL% if exist %NEW% ren %NEW% BattlegroundDB.dll
+if exist %OLD% del /f /q %OLD%
+
+start """" %EXE%
+
+timeout /t 3 /nobreak >nul
+del /f /q ""%~f0""
 ";
-                File.WriteAllText(UpdaterBat, bat);
+            File.WriteAllText(UpdaterBat, bat, System.Text.Encoding.Default);
 
-                // 启动批处理
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = UpdaterBat,
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                    CreateNoWindow = true
-                });
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = UpdaterBat,
+                WorkingDirectory = ExeDir,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                CreateNoWindow = true,
+                UseShellExecute = true,
+            });
 
-                // 退出 HBT
-                Environment.Exit(0);
+            Console.WriteLine("[BgdbUpdate] 更新脚本已启动，正在退出以应用更新…");
+            try
+            {
+                MessageBox.Show(
+                    "正在应用卡牌库更新…\n\n程序将自动关闭并重新打开，请稍候。",
+                    "更新中",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
+            catch { }
+            Environment.Exit(0);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[BgdbUpdate] 检查失败: {ex.Message}");
+            Console.WriteLine($"[BgdbUpdate] 检查/更新失败: {ex.Message}");
+            try { MessageBox.Show("卡牌库更新失败：\n" + ex.Message, "更新失败", MessageBoxButton.OK, MessageBoxImage.Warning); } catch { }
         }
     }
 
@@ -109,13 +154,15 @@ del ""%~f0""
     {
         try
         {
-            // 直接从嵌入资源读取版本号，不依赖 Cards.Load()（避免 System.Text.Json 缺失问题）
             var asm = typeof(BattlegroundDB.Cards).Assembly;
             using var stream = asm.GetManifestResourceStream("BattlegroundDB.Data.bg_cards.json");
-            if (stream == null) return null;
-            using var reader = new System.IO.StreamReader(stream);
+            if (stream == null)
+            {
+                Console.WriteLine("[BgdbUpdate] 未找到嵌入资源 bg_cards.json");
+                return null;
+            }
+            using var reader = new StreamReader(stream);
             var json = reader.ReadToEnd();
-            // 简单提取 "version": "xxx"
             var match = System.Text.RegularExpressions.Regex.Match(json, @"""version""\s*:\s*""([^""]+)""");
             return match.Success ? match.Groups[1].Value : null;
         }
@@ -154,4 +201,5 @@ del ""%~f0""
         [JsonProperty("currentPatch")] public string CurrentPatch { get; set; }
     }
 }
+
 }

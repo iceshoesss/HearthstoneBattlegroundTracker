@@ -399,6 +399,9 @@ public static class ApiClient
         };
         if (timeout)
             body["timeout"] = true;
+        // 每局拔线次数（服务端显示 +9(-N)）；用本局 ReconnectTimes，不跨局累计
+        var disc = reconnectTimes == null ? 0 : reconnectTimes.Count;
+        body["disconnects"] = disc;
         if (reconnectTimes != null && reconnectTimes.Count > 0)
             body["reconnectTimes"] = reconnectTimes;
         if (otherPlacements != null && otherPlacements.Count > 0)

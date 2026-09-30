@@ -417,6 +417,10 @@ public class GameMonitorService : IDisposable
                 _gameGeneration++;
                 _league.Reset();
                 _currentGameUuid = "";
+                // 每局拔线次数清零，不跨局累计
+                DisconnectService.ResetReconnectCount();
+                DisconnectService.EndReconnect();
+                _currentGame.ReconnectTimes.Clear();
                 SetPhase(GamePhase.PreLobby);
                 if (!string.IsNullOrEmpty(_currentGame.HeroName))
                     Log($"新对局开始 - 英雄: {_currentGame.HeroName}");
@@ -1117,6 +1121,7 @@ public class GameMonitorService : IDisposable
         _gameGeneration++;
         _league.Reset();
         DisconnectService.EndReconnect(); // 清除拔线状态
+        DisconnectService.ResetReconnectCount(); // 每局拔线次数清零，不跨局累计
         ResetPlayerInfo();
         OnPhaseChanged?.Invoke(GamePhase.Idle, _currentGame);
     }

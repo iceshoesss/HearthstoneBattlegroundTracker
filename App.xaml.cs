@@ -19,9 +19,30 @@ public partial class App : Application
         _mutex = new System.Threading.Mutex(true, "HearthstoneBattlegroundTracker_SingleInstance", out bool createdNew);
         if (!createdNew)
         {
-            MessageBox.Show("HearthstoneBattlegroundTracker 已在运行中", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
-            Shutdown();
-            return;
+            // 自动更新重启：旧进程可能仍在退出，静默等待锁，不弹「已在运行」
+            var updating = Environment.GetEnvironmentVariable("HBT_UPDATING") == "1";
+            if (updating)
+            {
+                var ok = false;
+                for (int i = 0; i < 20; i++)
+                {
+                    System.Threading.Thread.Sleep(500);
+                    _mutex.Dispose();
+                    _mutex = new System.Threading.Mutex(true, "HearthstoneBattlegroundTracker_SingleInstance", out createdNew);
+                    if (createdNew) { ok = true; break; }
+                }
+                if (!ok)
+                {
+                    Shutdown();
+                    return;
+                }
+            }
+            else
+            {
+                MessageBox.Show("HearthstoneBattlegroundTracker 已在运行中", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                Shutdown();
+                return;
+            }
         }
 
         // HearthMirror + BobsBuddy assembly resolve
