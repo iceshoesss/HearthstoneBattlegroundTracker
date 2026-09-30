@@ -649,19 +649,72 @@ public class GameMonitorService : IDisposable
 
     private void ForceEndGame()
     {
-        // 兜底处理：只更新计分板，不做任何 API 上报
+        // 兜底结束：场景 4→15 等异常离场。
+        // 设计：排名仍尽量上报，积分由服务端 timeout 规则记 0。
         var heroName = _currentGame.HeroName ?? "未知英雄";
         var heroCardId = _currentGame.HeroCardId ?? "";
 
         Log($"兜底结束 - {heroName}");
 
-        // 保存简化记录（排名=0，分数=0）
+        int placement = 0;
+        var otherPlacements = new List<(ulong lo, int placement)>();
+        try
+        {
+            var rankings = _hm.GetPlayerRankings();
+            if (rankings.Count > 0)
+            {
+                if (_teamIdToLo.Count == 0)
+                    BuildTeamIdToLoMapping(rankings);
+                // 自己名次：按 hero 匹配
+                foreach (var (hCard, rank, isDead, teamId, playerId) in rankings)
+                {
+                    if (!string.IsNullOrEmpty(_currentGame.HeroCardId)
+                        && string.Equals(hCard, _currentGame.HeroCardId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        placement = rank;
+                        break;
+                    }
+                }
+                foreach (var (hCard, rank, isDead, teamId, playerId) in rankings)
+                {
+                    if (placement > 0 && rank > placement
+                        && _teamIdToLo.TryGetValue(teamId, out var lo) && lo != 0 && lo != _localPlayerLo)
+                        otherPlacements.Add((lo, rank));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log("兜底读取排名失败: " + ex.Message);
+        }
+
+        // 联赛局：仍上报排名（timeout=true，服务端不给分）
+        if (_league.IsLeagueGame && !string.IsNullOrEmpty(_currentGameUuid))
+        {
+            try
+            {
+                var ok = ApiClient.UpdatePlacementAsync(
+                    _currentGameUuid, _localPlayerBattleTag, _localPlayerLo,
+                    placement > 0 ? placement : 8,
+                    _currentGame.ReconnectTimes, otherPlacements, timeout: true)
+                    .GetAwaiter().GetResult();
+                Log(ok
+                    ? $"兜底已上报排名 {(placement > 0 ? placement : 8)}（timeout，不计分）"
+                    : "兜底上报排名失败");
+            }
+            catch (Exception ex)
+            {
+                Log("兜底上报异常: " + ex.Message);
+            }
+        }
+
+        // 保存简化记录（本地计分板；积分=0）
         var record = new GameRecord
         {
             BattleTag = _localPlayerBattleTag,
             HeroName = heroName,
             HeroCardId = heroCardId,
-            Placement = 0,
+            Placement = placement,
             Points = 0,
             Rating = _lastKnownMmr,
             RatingAfter = 0,

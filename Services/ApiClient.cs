@@ -16,6 +16,14 @@ namespace HBT
 /// </summary>
 public static class ApiClient
 {
+    /// <summary>界面日志（MainWindow 挂上 AppendLog）</summary>
+    public static Action<string> OnLog;
+
+    private static void Log(string msg)
+    {
+        Console.WriteLine(msg);
+        try { OnLog?.Invoke(msg); } catch { }
+    }
     // 配置
     private static string _baseUrl = "";
     public static string BaseUrl => _baseUrl;
@@ -111,6 +119,76 @@ public static class ApiClient
         }
     }
 
+    /// <summary>测试：check-league 前把等待组脚本位 remap 成真实路人</summary>
+    public static bool TestRemap
+    {
+        get
+        {
+            // 1) shared_config.json / config.json 里的 "testRemap": true
+            if (Config.Current != null && Config.Current.TestRemap) return true;
+            // 2) exe 目录 test_remap.on
+            try
+            {
+                var flag = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test_remap.on");
+                if (File.Exists(flag)) return true;
+            }
+            catch { }
+            // 3) 环境变量
+            var v = Environment.GetEnvironmentVariable("TEST_REMAP");
+            return v == "1" || string.Equals(v, "true", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>启动时打一次，方便排查开关是否生效</summary>
+    public static void LogTestRemapEnv()
+    {
+        var v = Environment.GetEnvironmentVariable("TEST_REMAP") ?? "(null)";
+        var file = File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "test_remap.on"));
+        Log($"[API] TestRemap={TestRemap} (cfg={Config.Current?.TestRemap} test_remap.on={file} env='{v}') pid={System.Diagnostics.Process.GetCurrentProcess().Id}");
+    }
+
+    /// <summary>把非自己的大厅路人写入等待组（测试用）</summary>
+    public static async Task<bool> RemapLosAsync(string selfTag, List<Dictionary<string, object>> strangers)
+    {
+        if (!TestRemap)
+        {
+            Log("[API] TEST_REMAP 未启用，跳过 remap-los");
+            return true;
+        }
+        if (strangers == null || strangers.Count == 0) return true;
+        try
+        {
+            var body = new Dictionary<string, object>
+            {
+                ["battleTag"] = selfTag ?? "",
+                ["players"] = strangers,
+            };
+            Log($"[API] test remap-los：{strangers.Count} 个路人 → 等待组脚本位");
+            string json = null;
+            var ws = MatchSessionClient.Active;
+            if (ws != null && ws.IsConnected)
+            {
+                json = await ws.RequestAsync("remap-los", body, 8000);
+                if (json != null) Log("[API] remap-los 走 WS 成功");
+            }
+            if (json == null)
+            {
+                var (ok, hjson) = await PostAsync("/api/plugin/test/remap-los", body);
+                if (!ok) return false;
+                json = hjson;
+                Log("[API] remap-los 走 HTTP 成功");
+            }
+            Log("[API] test remap-los 完成: " + json);
+            return json.Contains("\"ok\"") && json.Contains("true");
+        }
+        catch (Exception e)
+        {
+            LastError = "remap-los 异常: " + e.Message;
+            Log("[API] ⚠️ " + LastError);
+            return false;
+        }
+    }
+
     /// <summary>
     /// 英雄选定后调用，检查是否为联赛对局
     /// </summary>
@@ -169,6 +247,29 @@ public static class ApiClient
             ["startedAt"] = startedAt ?? ""
         };
 
+        // 测试：先 remap 等待组脚本位 → 真实路人 Lo，再 check-league
+        Log(TestRemap
+            ? "[API] TEST_REMAP=1，check-league 前将 remap 等待组"
+            : "[API] TEST_REMAP 未开，check-league 使用原始等待组 Lo");
+        if (TestRemap)
+        {
+            var strangers = new List<Dictionary<string, object>>();
+            foreach (var p in validPlayers)
+            {
+                if (p.Lo == accountIdLo) continue;
+                strangers.Add(new Dictionary<string, object>
+                {
+                    ["accountIdLo"] = p.Lo.ToString(),
+                    ["battleTag"] = "",
+                    ["displayName"] = p.DisplayName ?? "",
+                });
+            }
+            var remapOk = await RemapLosAsync(playerId, strangers);
+            Log(remapOk
+                ? $"[API] test remap 完成，{strangers.Count} 个路人入桌"
+                : "[API] ⚠️ test remap 失败，check-league 可能不匹配");
+        }
+
         try
         {
             // 主通道：match WS（一场一连）；失败退回 HTTP
@@ -198,13 +299,14 @@ public static class ApiClient
 
             // 提取服务端返回的 gameUuid（淘汰赛由服务端生成）
             var serverUuid = ExtractJsonString(json, "gameUuid");
-            if (!string.IsNullOrEmpty(serverUuid))
+            if (!string.IsNullOrEmpty(serverUuid) && serverUuid != "null")
             {
                 ServerGameUuid = serverUuid;
                 Console.WriteLine($"[API] ✅ 服务端 gameUuid: {ServerGameUuid}");
             }
 
-            var isLeague = json.Contains("\"isLeague\"") && json.Contains("true");
+            // 必须精确解析 isLeague，不能用 Contains("true")（会误伤 ok:true）
+            var isLeague = ExtractJsonBool(json, "isLeague");
             if (isLeague)
             {
                 Console.WriteLine("[API] 联赛对局已匹配");
@@ -283,7 +385,8 @@ public static class ApiClient
         ulong accountIdLo,
         int placement,
         List<string> reconnectTimes = null,
-        List<(ulong lo, int placement)> otherPlacements = null)
+        List<(ulong lo, int placement)> otherPlacements = null,
+        bool timeout = false)
     {
         LastError = "";
 
@@ -294,6 +397,8 @@ public static class ApiClient
             ["placement"] = placement,
             ["playerId"] = playerId
         };
+        if (timeout)
+            body["timeout"] = true;
         if (reconnectTimes != null && reconnectTimes.Count > 0)
             body["reconnectTimes"] = reconnectTimes;
         if (otherPlacements != null && otherPlacements.Count > 0)
@@ -425,13 +530,13 @@ public static class ApiClient
             }
 
             var serverUuid = ExtractJsonString(json, "gameUuid");
-            if (!string.IsNullOrEmpty(serverUuid))
+            if (!string.IsNullOrEmpty(serverUuid) && serverUuid != "null")
             {
                 ServerGameUuid = serverUuid;
                 Console.WriteLine($"[API] ✅ 服务端 gameUuid: {ServerGameUuid}");
             }
 
-            var isLeague = json.Contains("\"isLeague\"") && json.Contains("true");
+            var isLeague = ExtractJsonBool(json, "isLeague");
             if (isLeague)
                 Console.WriteLine("[API] 联赛对局已匹配");
             else
@@ -754,9 +859,20 @@ public static class ApiClient
             startIdx = idx + 1;
         }
         idx += search.Length;
-        // 跳过 ": "
-        idx = json.IndexOf('"', idx);
-        if (idx < 0) return "";
+        // 跳过冒号与空白
+        while (idx < json.Length && (json[idx] == ' ' || json[idx] == ':' || json[idx] == '\t'))
+            idx++;
+        if (idx >= json.Length) return "";
+        // null / true / false / 数字：不是字符串，不当成值
+        if (json[idx] != '"')
+        {
+            if (json.Substring(idx).StartsWith("null")) return "";
+            // 数字或字面量：直接返回 token（避免吞掉后面的 "season"）
+            int j = idx;
+            while (j < json.Length && json[j] != ',' && json[j] != '}' && json[j] != ' ' && json[j] != '\n')
+                j++;
+            return json.Substring(idx, j - idx).Trim();
+        }
         idx++; // 跳过开始引号
         // 逐字符扫描，处理转义引号
         var sb = new StringBuilder();

@@ -181,6 +181,8 @@ public partial class MainWindow : Window
         _monitor = new GameMonitorService(config, _hm);
 
         // 订阅核心事件
+        ApiClient.OnLog = msg => Dispatcher.BeginInvoke(new Action(() => AppendLog(msg)));
+        ApiClient.LogTestRemapEnv();
         _monitor.OnPhaseChanged += (phase, game) => Dispatcher.Invoke(() => UpdatePhaseUI(phase, game));
         // 场景 15(BACON 大厅) → 4(GAMEPLAY)：战棋正式开局，停止进房轮询
         _monitor.OnSceneChanged += scene => Dispatcher.Invoke(() =>
@@ -716,7 +718,7 @@ public partial class MainWindow : Window
                 MatchStatusText.Foreground = new SolidColorBrush(Color.FromRgb(0xf5, 0x9e, 0x0b));
                 SideStateText.Text = "请确认你的名次";
                 SideConfirmText.Text = "请核对系统记录的名次，有问题可提交异议";
-                BtnSidePrimary.Content = "名次无误";
+                BtnSidePrimary.Content = "确定";
                 BtnSideSecondary.Content = "有异议";
                 BtnSideSecondary.Visibility = Visibility.Visible;
             }

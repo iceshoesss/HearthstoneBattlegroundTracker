@@ -16,6 +16,11 @@ namespace HBT
 public class Config
 {
     public string ApiBaseUrl { get; set; } = "http://localhost:5000";
+    /// <summary>测试：check-league 前 remap 等待组为真实路人（全流程仿真）</summary>
+    public bool TestRemap { get; set; }
+
+    /// <summary>最近一次 Load 结果（供 ApiClient 读开关）</summary>
+    public static Config Current { get; private set; }
 
     public static Config Load()
     {
@@ -24,7 +29,8 @@ public class Config
         if (!string.IsNullOrEmpty(envPath) && File.Exists(envPath))
         {
             Console.WriteLine($"[Config] 使用环境变量指定: {envPath}");
-            return Parse(envPath);
+            Current = Parse(envPath);
+            return Current;
         }
 
         // 2. 从 exe 目录向上查找 shared_config.json
@@ -35,7 +41,8 @@ public class Config
             if (File.Exists(shared))
             {
                 Console.WriteLine($"[Config] 找到共享配置: {shared}");
-                return Parse(shared);
+                Current = Parse(shared);
+                return Current;
             }
             var parent = Directory.GetParent(dir);
             if (parent == null) break;
@@ -48,7 +55,8 @@ public class Config
         if (File.Exists(local))
         {
             Console.WriteLine($"[Config] 使用本地配置: {local}");
-            return Parse(local);
+            Current = Parse(local);
+            return Current;
         }
 
         // 4. config.json.example
@@ -56,11 +64,13 @@ public class Config
         if (File.Exists(example))
         {
             Console.WriteLine($"[Config] config.json 不存在，使用 example");
-            return Parse(example);
+            Current = Parse(example);
+            return Current;
         }
 
         Console.WriteLine("[Config] 未找到任何配置文件，使用默认值");
-        return new Config();
+        Current = new Config();
+        return Current;
     }
 
     private static Config Parse(string path)
@@ -84,9 +94,11 @@ public class Config
 
                 if (key == "apiBaseUrl")
                     cfg.ApiBaseUrl = val;
+                else if (key == "testRemap")
+                    cfg.TestRemap = val == "1" || val.Equals("true", StringComparison.OrdinalIgnoreCase);
             }
 
-            Console.WriteLine($"[Config] apiBaseUrl={cfg.ApiBaseUrl}");
+            Console.WriteLine($"[Config] apiBaseUrl={cfg.ApiBaseUrl} testRemap={cfg.TestRemap}");
             return cfg;
         }
         catch (Exception e)
