@@ -16,11 +16,11 @@
         <!-- ═══════════ 主区域 ═══════════ -->
         <Grid Grid.Column="0">
             <Grid.RowDefinitions>
-                <RowDefinition Height="60"/>
-                <RowDefinition Height="90"/>
-                <RowDefinition Height="56"/>
-                <RowDefinition Height="56"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition x:Name="RowHeader" Height="60"/>
+                <RowDefinition x:Name="RowGame" Height="110"/>
+                <RowDefinition x:Name="RowCode" Height="64"/>
+                <RowDefinition x:Name="RowMatch" Height="64"/>
+                <RowDefinition x:Name="RowLog" Height="*"/>
             </Grid.RowDefinitions>
 
             <!-- Header -->
@@ -87,8 +87,8 @@
                 </Grid>
             </Border>
 
-            <!-- Log -->
-            <Border Grid.Row="4" Background="#0a0f19">
+            <!-- Log（仅 Debug 显示；Release 隐藏并拉伸上方区域） -->
+            <Border x:Name="LogBorder" Grid.Row="4" Background="#0a0f19">
                 <Grid>
                     <TextBlock Text="日志" FontSize="10" FontWeight="Bold" Foreground="#64748b" Margin="16,6,0,0"/>
                     <TextBox x:Name="LogBox" VerticalScrollBarVisibility="Auto" IsReadOnly="True"

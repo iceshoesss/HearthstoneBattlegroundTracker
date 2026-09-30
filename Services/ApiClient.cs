@@ -25,7 +25,7 @@ public static class ApiClient
         try { OnLog?.Invoke(msg); } catch { }
     }
     // 配置
-    private static string _baseUrl = "";
+    private static string _baseUrl = "https://www.dazy.asia/";
     public static string BaseUrl => _baseUrl;
 
     // API Key 编译时写入，不暴露给用户配置

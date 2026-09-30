@@ -151,6 +151,14 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+#if !DEBUG
+        // 正式包：隐藏日志栏，主区域拉高填满原窗口高度
+        if (LogBorder != null) LogBorder.Visibility = Visibility.Collapsed;
+        if (RowLog != null) RowLog.Height = new GridLength(0);
+        if (RowGame != null) RowGame.Height = new GridLength(1, GridUnitType.Star);
+        if (RowCode != null) RowCode.Height = new GridLength(72);
+        if (RowMatch != null) RowMatch.Height = new GridLength(72);
+#endif
         _logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "HBT_debug.log");
 
         var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
@@ -899,18 +907,26 @@ public partial class MainWindow : Window
 
     private void AppendLog(string msg)
     {
+#if DEBUG
         var timestamp = DateTime.Now.ToString("HH:mm:ss");
-        LogBox.AppendText($"[{timestamp}] {msg}\n");
-        LogBox.ScrollToEnd();
-
-        _logLineCount++;
-        if (_logLineCount > 200)
+        if (LogBox != null)
         {
-            var text = LogBox.Text;
-            var idx = text.IndexOf('\n', text.Length / 2);
-            if (idx > 0) LogBox.Text = text.Substring(idx + 1);
-            _logLineCount = 100;
+            LogBox.AppendText($"[{timestamp}] {msg}\n");
+            LogBox.ScrollToEnd();
+
+            _logLineCount++;
+            if (_logLineCount > 200)
+            {
+                var text = LogBox.Text;
+                var idx = text.IndexOf('\n', text.Length / 2);
+                if (idx > 0) LogBox.Text = text.Substring(idx + 1);
+                _logLineCount = 100;
+            }
         }
+#else
+        // 正式包无日志栏；仍写入 HBT_debug.log / Console
+        Console.WriteLine(msg);
+#endif
     }
 }
 

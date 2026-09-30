@@ -5,18 +5,21 @@ namespace HBT
 {
 
 /// <summary>
-/// 运行时配置（当前仅 API 地址）
+/// 运行时配置。
 ///
-/// 查找顺序：
-/// 1. 环境变量 BGTRACKER_CONFIG 指定的路径
-/// 2. 从 exe 目录向上逐级查找 shared_config.json（最多 5 级）
-/// 3. exe 同目录的 config.json
-/// 4. exe 同目录的 config.json.example
+/// Release（发给选手）：不读外部配置文件，使用内置默认值（防改包/防泄露）。
+/// Debug（你自己编译）：支持 shared_config.json / 环境变量覆盖，便于联调。
 /// </summary>
 public class Config
 {
+#if DEBUG
     public string ApiBaseUrl { get; set; } = "http://localhost:5000";
-    /// <summary>测试：check-league 前 remap 等待组为真实路人（全流程仿真）</summary>
+#else
+    // 正式包内置地址，不暴露可改配置
+    public string ApiBaseUrl { get; set; } = "https://www.dazy.asia";
+#endif
+
+    /// <summary>测试：check-league 前 remap 等待组为真实路人（仅 Debug）</summary>
     public bool TestRemap { get; set; }
 
     /// <summary>最近一次 Load 结果（供 ApiClient 读开关）</summary>
@@ -24,7 +27,8 @@ public class Config
 
     public static Config Load()
     {
-        // 1. 环境变量指定
+#if DEBUG
+        // 1) 环境变量指定
         var envPath = Environment.GetEnvironmentVariable("BGTRACKER_CONFIG");
         if (!string.IsNullOrEmpty(envPath) && File.Exists(envPath))
         {
@@ -33,7 +37,7 @@ public class Config
             return Current;
         }
 
-        // 2. 从 exe 目录向上查找 shared_config.json
+        // 2) 从 exe 目录向上查找 shared_config.json
         var dir = AppDomain.CurrentDomain.BaseDirectory;
         for (int i = 0; i < 5; i++)
         {
@@ -49,7 +53,7 @@ public class Config
             dir = parent.FullName;
         }
 
-        // 3. exe 同目录 config.json
+        // 3) exe 同目录 config.json
         var exeDir = AppDomain.CurrentDomain.BaseDirectory;
         var local = Path.Combine(exeDir, "config.json");
         if (File.Exists(local))
@@ -59,20 +63,18 @@ public class Config
             return Current;
         }
 
-        // 4. config.json.example
-        var example = Path.Combine(exeDir, "config.json.example");
-        if (File.Exists(example))
-        {
-            Console.WriteLine($"[Config] config.json 不存在，使用 example");
-            Current = Parse(example);
-            return Current;
-        }
-
-        Console.WriteLine("[Config] 未找到任何配置文件，使用默认值");
+        Console.WriteLine("[Config] 未找到配置文件，使用 Debug 默认值");
         Current = new Config();
         return Current;
+#else
+        // Release：固定内置配置，忽略外部文件
+        Console.WriteLine("[Config] Release 内置配置 apiBaseUrl=" + "https://www.dazy.asia");
+        Current = new Config();
+        return Current;
+#endif
     }
 
+#if DEBUG
     private static Config Parse(string path)
     {
         try
@@ -107,6 +109,7 @@ public class Config
             return new Config();
         }
     }
+#endif
 }
 
 }
