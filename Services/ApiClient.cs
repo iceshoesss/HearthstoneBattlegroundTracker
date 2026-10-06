@@ -36,7 +36,22 @@ public static class ApiClient
     private const string ApiKey = "wangbadanandeluoni123";
 #endif
 
-    private static string _pluginVersion = "0.7.0"; // 服务端兼容版本，LeagueTool 实际版本另算
+    // X-HDT-Plugin：读程序集版本（csproj Version），与联赛工具窗口标题一致
+    private static readonly string _pluginVersion = GetAssemblyVersion();
+
+    private static string GetAssemblyVersion()
+    {
+        try
+        {
+            var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            if (v == null) return "0.7.0";
+            return $"{v.Major}.{v.Minor}.{(v.Build < 0 ? 0 : v.Build)}";
+        }
+        catch
+        {
+            return "0.7.0";
+        }
+    }
 
     static ApiClient()
     {
