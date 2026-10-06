@@ -100,9 +100,29 @@ public class GameMonitorService : IDisposable
     /// </summary>
     public string RefreshVerifyCode()
     {
+        // 未运行炉石不允许刷新（与开赛后才有登录码的流程一致）
+        if (System.Diagnostics.Process.GetProcessesByName("Hearthstone").Length == 0)
+        {
+            Log("刷新验证码失败：炉石未运行");
+            return null;
+        }
+
+        // 关游戏会 ResetPlayerInfo；重开后 BGSpy/日志线程可能尚未重新拉到 Tag/Lo。
+        // 先主动补拉（最多约 5 秒），再 initialize。
         if (string.IsNullOrEmpty(_localPlayerBattleTag) || _localPlayerLo == 0)
         {
-            Log("刷新验证码失败：玩家信息尚未就绪");
+            for (int i = 0; i < 20 && (string.IsNullOrEmpty(_localPlayerBattleTag) || _localPlayerLo == 0); i++)
+            {
+                TryFetchPlayerInfo();
+                if (!string.IsNullOrEmpty(_localPlayerBattleTag) && _localPlayerLo != 0)
+                    break;
+                System.Threading.Thread.Sleep(250);
+            }
+        }
+
+        if (string.IsNullOrEmpty(_localPlayerBattleTag) || _localPlayerLo == 0)
+        {
+            Log("刷新验证码失败：玩家信息尚未就绪（等待炉石/BGSpy 连接后重试）");
             return null;
         }
 
