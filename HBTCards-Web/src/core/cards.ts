@@ -20,7 +20,7 @@ export interface CardData {
   manaCost?: number | null; // 法术/畸变/饰品费用
   trinketTier?: 'lesser' | 'greater' | null; // 饰品：小/大
   armor?: number | null; // 英雄护甲值
-  isDarkGift?: boolean; // 黑暗之赐（选取法术 childIds 圈定，从法术中拆分展示）
+  isDarkGift?: boolean; // 黑暗之赐（hsbg.cards categories=darkgift，从法术中拆分展示）
   heroPower?: {
     cardId: string;
     name: string;

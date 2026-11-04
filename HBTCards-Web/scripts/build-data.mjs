@@ -21,10 +21,13 @@ if (existsSync(hsbgJsonPath)) {
   console.log('使用 BattlegroundDB 索引（金色版本解析可能不完整）');
 }
 
-// 黑暗之赐：由选取法术 BG36_MidGameEffect_000 的 childIds 精确圈定
-// （不能用 cardId 前缀 _000t 匹配 —— 会混入黑暗之赐衍生出的二级 token，如 t28t/t29t）
-const darkGiftParent = raw.cards.find(c => c.cardId === 'BG36_MidGameEffect_000');
-const darkGiftIds = new Set(darkGiftParent?.childIds ?? []);
+// 黑暗之赐（Dark Gift）识别
+// 注意：上游 hsbg.cards 已不再收录「选取法术」本体 BG36_MidGameEffect_000（连 pool=all 都返回 404），
+// 以前靠它的 childIds 圈定，结果恒为空集 —— 黑暗之赐页面就是空的。
+// 现在优先用 hsbg.cards 的 categories 标签（BGDB 已透传），老数据没有该字段时按 cardId 规则兜底。
+const isDarkGiftCard = (c) =>
+  (Array.isArray(c.categories) && c.categories.includes('darkgift')) ||
+  /_MidGameEffect_\d+t[\dt]*$/.test(c.cardId ?? '');
 
 const cards = raw.cards
   .filter(c => c.cardType === 'minion' && !c.isToken && !c.isDuosOnly)
@@ -107,7 +110,7 @@ const others = raw.cards
       keywords: c.keywords ?? [],
       isBuddy: false,
       isTimewarped: !!c.isTimewarped, // 注：时空扭曲法术确实存在（如各英雄「XX之力」，共 32 张）
-      isDarkGift: darkGiftIds.has(c.id),
+      isDarkGift: isDarkGiftCard(c),
       dbfIdGold: c.dbfIdGold ?? null,
       heroPower, // 英雄技能（仅英雄类型有值）
     };
