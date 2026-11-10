@@ -160,6 +160,11 @@ public class GameMonitorService : IDisposable
         _hm.OnDisconnected += () => Log("BGSpy 已断开");
         ApiClient.Init(config.ApiBaseUrl);
         GameStore.Init();
+        // 上报队列：落盘续传 + 名次补齐回调
+        UploadQueue.OnLog = Log;
+        UploadQueue.PlacementResolver = gameUuid =>
+            string.Equals(_currentGameUuid, gameUuid, StringComparison.Ordinal) ? TryResolveOwnPlacement() : 0;
+        UploadQueue.Init();
         _league = new LeagueClient();
         _league.OnStateChanged = OnLeagueStateChanged;
     }
@@ -705,24 +710,22 @@ public class GameMonitorService : IDisposable
             Log("兜底读取排名失败: " + ex.Message);
         }
 
-        // 联赛局：仍上报排名（timeout=true，服务端不给分）
+        // 联赛局：仍上报排名（timeout=true，服务端不给分）。
+        // 入队即可，重试与持久化交给 UploadQueue，不再阻塞日志线程。
         if (_league.IsLeagueGame && !string.IsNullOrEmpty(_currentGameUuid))
         {
-            try
+            UploadQueue.Enqueue(new UploadQueue.Item
             {
-                var ok = ApiClient.UpdatePlacementAsync(
-                    _currentGameUuid, _localPlayerBattleTag, _localPlayerLo,
-                    placement > 0 ? placement : 8,
-                    _currentGame.ReconnectTimes, otherPlacements, timeout: true)
-                    .GetAwaiter().GetResult();
-                Log(ok
-                    ? $"兜底已上报排名 {(placement > 0 ? placement : 8)}（timeout，不计分）"
-                    : "兜底上报排名失败");
-            }
-            catch (Exception ex)
-            {
-                Log("兜底上报异常: " + ex.Message);
-            }
+                GameUuid = _currentGameUuid,
+                BattleTag = _localPlayerBattleTag,
+                AccountIdLo = _localPlayerLo,
+                // 兜底场景拿不到名次时按 8 报（服务端 timeout 不计分），与旧行为一致
+                Placement = placement > 0 ? placement : 8,
+                ReconnectTimes = new List<string>(_currentGame.ReconnectTimes),
+                Others = ToQueueOthers(otherPlacements),
+                Timeout = true,
+            });
+            Log($"兜底排名已入上报队列 {(placement > 0 ? placement : 8)}（timeout，不计分）");
         }
 
         // 保存简化记录（本地计分板；积分=0）
@@ -765,6 +768,13 @@ public class GameMonitorService : IDisposable
         {
             Log($"构筑模式对局结束 - 跳过 BG 流程");
             return;
+        }
+
+        // Parser 没拿到名次（HeroPlacement=0）时先补一次：否则 0 会被服务端判为非法（400）
+        if (placement <= 0)
+        {
+            placement = TryResolveOwnPlacement();
+            Log(placement > 0 ? $"名次由内存排名补齐: {placement}" : "名次暂未知（交给上报队列继续补）");
         }
 
         Log($"对局结束 - 排名: {placement}");
@@ -817,23 +827,21 @@ public class GameMonitorService : IDisposable
                 }
             }
 
-            for (int attempt = 0; attempt < 3; attempt++)
+            // 入队即可：重试/退避/持久化都在 UploadQueue（后台线程），日志线程立刻返回
+            UploadQueue.Enqueue(new UploadQueue.Item
             {
-                var ok = ApiClient.UpdatePlacementAsync(_currentGameUuid, _localPlayerBattleTag,
-                    _localPlayerLo, placement, _currentGame.ReconnectTimes, otherPlacements)
-                    .GetAwaiter().GetResult();
-
-                if (ok)
-                {
-                    Log($"排名已上传 - {placement}名");
-                    break;
-                }
-
-                if (attempt < 2) Thread.Sleep(2000);
-                else Log("上传失败，已重试3次");
-            }
+                GameUuid = _currentGameUuid,
+                BattleTag = _localPlayerBattleTag,
+                AccountIdLo = _localPlayerLo,
+                Placement = placement > 0 ? placement : 0,   // 0 = 还没读到，队列里继续补
+                ReconnectTimes = new List<string>(_currentGame.ReconnectTimes),
+                Others = ToQueueOthers(otherPlacements),
+                Timeout = false,
+            });
+            Log(placement > 0
+                ? $"排名已入上报队列 - {placement}名（后台重试，关程序也不丢）"
+                : "排名暂未知，已入队列等待补齐名次");
         }
-
         // ── 保存记录（联赛积分 + MMR 变动）──
         var points = _league.IsLeagueGame ? (placement == 1 ? 9 : Math.Max(1, 9 - placement)) : 0;
         var record = new GameRecord
@@ -872,6 +880,55 @@ public class GameMonitorService : IDisposable
             Thread.Sleep(500);
         }
         return null;
+    }
+
+    /// <summary>
+    /// 从内存排名反查自己的名次（Parser 没拿到 HeroPlacement 时的兜底）。
+    /// 返回 0 表示确实读不到——此时绝不能拿 0 去上报，服务端会判 400。
+    /// </summary>
+    private int TryResolveOwnPlacement()
+    {
+        try
+        {
+            var rankings = _hm.GetPlayerRankings();
+            if (rankings.Count == 0) return 0;
+
+            // 1) 按英雄卡牌 ID 精确匹配
+            if (!string.IsNullOrEmpty(_currentGame.HeroCardId))
+            {
+                foreach (var (heroCardId, rank, isDead, teamId, playerId) in rankings)
+                {
+                    if (rank > 0 && string.Equals(heroCardId, _currentGame.HeroCardId, StringComparison.OrdinalIgnoreCase))
+                        return rank;
+                }
+            }
+
+            // 2) 按 teamId → Lo 映射匹配自己
+            if (_localPlayerLo != 0)
+            {
+                if (_teamIdToLo.Count == 0) BuildTeamIdToLoMapping(rankings);
+                foreach (var (heroCardId, rank, isDead, teamId, playerId) in rankings)
+                {
+                    if (rank > 0 && _teamIdToLo.TryGetValue(teamId, out var lo) && lo == _localPlayerLo)
+                        return rank;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[Monitor] 名次兜底读取失败: " + ex.Message);
+        }
+        return 0;
+    }
+
+    /// <summary>(lo, placement) → 上报队列结构</summary>
+    private static List<UploadQueue.OtherPlacement> ToQueueOthers(List<(ulong lo, int placement)> others)
+    {
+        var list = new List<UploadQueue.OtherPlacement>();
+        if (others == null) return list;
+        foreach (var (lo, placement) in others)
+            list.Add(new UploadQueue.OtherPlacement { Lo = lo, Placement = placement });
+        return list;
     }
 
     /// <summary>构建 teamId → Lo 映射（优先用 playerId，fallback 到 heroCardId）</summary>

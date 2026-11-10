@@ -249,6 +249,9 @@ public partial class MainWindow : Window
         if (_fadeCloseStarted) return;
         _fadeCloseStarted = true;
 
+        // 给还没确认的排名上报最后一点时间（只做一次；失败也已落盘，下次启动续传）
+        try { UploadQueue.FlushBlocking(3000); } catch { }
+
         var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0,
             TimeSpan.FromMilliseconds(200))
         {
