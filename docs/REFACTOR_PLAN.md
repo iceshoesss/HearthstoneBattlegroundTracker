@@ -1,5 +1,7 @@
 # bg_tool 重构计划
 
+> ⚠️ **历史方案文档**（`refactor/bg-tool` 分支，基于 v0.6.0）。当前分支 `feature/league-tool-basic` 的目录结构与服务划分已与文中不同，请以代码为准。
+
 > 分支：`refactor/bg-tool`
 > 前一个版本 tag：`v0.6.0-pre-refactor`
 > 基于 `claw_version`（v0.6.0）

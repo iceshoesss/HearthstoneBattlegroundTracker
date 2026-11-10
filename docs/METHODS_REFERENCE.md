@@ -2,6 +2,10 @@
 
 > 记录项目中所有可复用的方法、服务、工具类及其用法。避免重复造轮子。
 
+> ⚠️ **basic 分支注意**：本文写于完整版（含覆盖层/卡牌浏览器）时期。以下条目在当前 `feature/league-tool-basic` 中**文件已不存在**，仅作历史参考：
+> 第 4 节 `BoardStateStore`、第 9 节 `ImageCacheService`、第 14 节「插件系统」。
+> 其余章节（`ApiClient` / `LeagueClient` / `GameStore` / `Parser` / `BattlegroundSpy` 等）仍然有效。
+
 ---
 
 ## 目录

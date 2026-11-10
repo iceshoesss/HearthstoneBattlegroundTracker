@@ -7,10 +7,13 @@
 ## 功能
 
 - **联赛对局检测**：自动识别联赛对局，上报排名
+- **报名参赛**：插件内直接报名匹配（`queue/join`），排队进度 / 成组 / 对局中 / 名次确认全流程
+- **同桌名单**：成组后显示 8 人名单，可逐条复制，已进房的名字标绿
+- **名次确认**：「确定」或「有异议」，避免名次误记
 - **MMR 追踪**：游戏开始时读取 MMR，游戏结束后读取 MMR 变动
 - **阵容快照**：游戏结束时记录己方场面（随从属性 + 关键词）
 - **战绩记录**：本地保存对局记录，UI 显示最近战绩和今日统计
-- **断线重连**：自动识别并恢复对局状态
+- **断线重连**：自动识别并恢复对局状态，每局拔线次数随对局上报（`disconnects`）
 - **非联赛对局**：支持非联赛对局的 MMR 变动记录
 
 ## 项目结构
@@ -25,6 +28,7 @@ HBT/                                   # 基础联赛工具
 ├── Services/                          # 核心服务
 │   ├── GameMonitorService.cs          # 游戏状态机
 │   ├── HearthMirrorService.cs         # BGSpy 包装层
+│   ├── MatchSessionClient.cs          # 报名匹配 WebSocket（一场一连）
 │   ├── LeagueClient.cs                # 联赛 API 客户端
 │   └── ApiClient.cs                   # HTTP API 客户端
 ├── Models/                            # 数据模型
@@ -57,25 +61,34 @@ dotnet run --project BattlegroundSpy.Test -c Release
 
 ## 配置
 
-程序启动后自动检测炉石进程，无需手动配置。
+程序启动后自动检测炉石进程，玩家信息、MMR、大厅数据全部从游戏内存读取，**无需手动配置**。
 
-### config.json（可选）
+### 服务端地址
 
-在 exe 同目录创建 `config.json`：
+| 构建 | 地址来源 |
+|------|----------|
+| **Release**（发给选手） | 编译时内置 `https://www.dazy.asia`，**不读任何外部配置文件**（防改包/防误配） |
+| **Debug**（自己联调） | 支持外部配置，见下 |
+
+Debug 的查找顺序（找到即停）：
+
+1. 环境变量 `BGTRACKER_CONFIG` 指定的 json 文件
+2. 从 exe 目录向上最多 5 层查找 `shared_config.json`（已 gitignore）
+3. exe 同目录的 `config.json`
 
 ```json
 {
   "apiBaseUrl": "http://localhost:5000",
-  "region": "CN",
-  "mode": "solo"
+  "testRemap": false
 }
 ```
 
-| 字段 | 说明 | 默认值 |
-|------|------|--------|
+| 字段 | 说明 | 默认值（Debug） |
+|------|------|-----------------|
 | `apiBaseUrl` | 服务端 API 地址 | `http://localhost:5000` |
-| `region` | 服务器区域 | `CN` |
-| `mode` | 游戏模式 | `solo` |
+| `testRemap` | 仅测试用：check-league 前把 Lo 重映射为真实路人 | `false` |
+
+`region` / `mode` 目前写死为 `CN` / `solo`（见 `LeagueClient`），不在配置文件里。
 
 ## API 端点
 
@@ -85,8 +98,21 @@ dotnet run --project BattlegroundSpy.Test -c Release
 | `/api/plugin/check-league` | POST | 检查是否为联赛对局 |
 | `/api/plugin/update-placement` | POST | 上报排名（仅联赛对局） |
 | `/api/plugin/report-game-stats` | POST | 上报游戏统计（MMR + 阵容 + RatingChange） |
+| `/api/plugin/queue/join` | POST | 报名匹配，返回 ticket |
+| `/api/plugin/queue/leave` | POST | 退出排队 |
+| `/api/plugin/confirm-placement` | POST | 名次确认 / 异议 |
+| `/api/plugin/match/ws` | WebSocket | 一场一连事件流（排队人数、成组、同桌名单、名次确认） |
 
-详细字段说明见 [API.md](API.md)。
+`check-league` / `update-placement` 在有 WS 连接时优先走 WS 请求-应答，失败退回 HTTP。详细字段说明见 [API.md](API.md)。
+
+## 安全说明
+
+插件的 `Authorization: Bearer` Key 是**编译进 exe 的共享凭证**，不是秘密：它存在于 git 历史和发布产物中，可被直接提取。因此：
+
+- 服务端必须把它当低信任凭证 —— 只授予 `/api/plugin/*` 上报权限，并叠加 `accountIdLo` 身份校验 + 频控；
+- 不要在这把 Key 之下挂任何读管理数据 / 改配置的接口；
+- 轮换时服务端与插件同时换，旧 Key 保留一个版本过渡期；
+- 需要真正保密的凭证时，改为服务端下发短期 token，不要继续往客户端里塞常量。
 
 ## 调试（mock 服务器）
 

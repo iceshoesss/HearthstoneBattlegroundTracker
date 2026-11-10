@@ -30,7 +30,7 @@ Requires Hearthstone to be running. Cannot run in CI or headless environments.
 - **BattlegroundSpy** (`BattlegroundSpy/`) — Memory reader via UnitySpy. Core file: `BattlegroundSpyReader.cs`
 - **UnitySpy** — Linked from `../../HDT_Reverse/unity-spy/` (source compiled into BattlegroundSpy.dll, not vendored in this repo)
 - **Basic branch scope** — combat sim / overlay / plugins removed; league tool only
-- **Services/** — `GameMonitorService` (state machine), `HearthMirrorService` (BGSpy wrapper), `LeagueClient`, `ApiClient`
+- **Services/** — `GameMonitorService` (state machine), `HearthMirrorService` (BGSpy wrapper), `MatchSessionClient` (match WebSocket), `LeagueClient`, `ApiClient`
 - **Parser/** — Power.log parser (secondary data source)
 
 ## Key Facts
