@@ -15,7 +15,9 @@ public partial class MainWindow : Window
     private GameMonitorService _monitor;
     private readonly string _logPath;
     private StreamWriter _logWriter;
-    private int _logLineCount;
+#if DEBUG
+    private int _logLineCount;   // 仅 Debug 的日志栏裁剪用
+#endif
     private string _matchTicket = "";
     private MatchSessionClient _matchSession;
     private int _pendingPlacement = -1;
@@ -188,12 +190,12 @@ public partial class MainWindow : Window
         var config = Config.Load();
         _monitor = new GameMonitorService(config, _hm);
 
-        // 订阅核心事件
+        // 订阅核心事件（一律 BeginInvoke：后台线程只投递，不等待 UI 线程，避免关窗时与 Closing 互锁）
         ApiClient.OnLog = msg => Dispatcher.BeginInvoke(new Action(() => AppendLog(msg)));
         ApiClient.LogTestRemapEnv();
-        _monitor.OnPhaseChanged += (phase, game) => Dispatcher.Invoke(() => UpdatePhaseUI(phase, game));
+        _monitor.OnPhaseChanged += (phase, game) => Dispatcher.BeginInvoke(new Action(() => UpdatePhaseUI(phase, game)));
         // 场景 15(BACON 大厅) → 4(GAMEPLAY)：战棋正式开局，停止进房轮询
-        _monitor.OnSceneChanged += scene => Dispatcher.Invoke(() =>
+        _monitor.OnSceneChanged += scene => Dispatcher.BeginInvoke(new Action(() =>
         {
             var prev = _monitor.LastScene;
             if (prev == SceneMode.BACON && scene == SceneMode.GAMEPLAY)
@@ -201,10 +203,10 @@ public partial class MainWindow : Window
                 StopRoomWatch();
                 AppendLog("场景 15→4，战棋开局，停止进房检测");
             }
-        });
-        _monitor.OnVerifyCodeChanged += code => Dispatcher.Invoke(() => VerifyCode.Text = code);
-        _monitor.OnLogMessage += msg => Dispatcher.Invoke(() => AppendLog(msg));
-        _monitor.OnPlayerNameChanged += name => Dispatcher.Invoke(() =>
+        }));
+        _monitor.OnVerifyCodeChanged += code => Dispatcher.BeginInvoke(new Action(() => VerifyCode.Text = code));
+        _monitor.OnLogMessage += msg => Dispatcher.BeginInvoke(new Action(() => AppendLog(msg)));
+        _monitor.OnPlayerNameChanged += name => Dispatcher.BeginInvoke(new Action(() =>
         {
             var lastParen = name.LastIndexOf('(');
             if (lastParen > 0)
@@ -221,11 +223,11 @@ public partial class MainWindow : Window
             }
             StatusLabel.Text = "● 已连接";
             StatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(0x22, 0xc5, 0x5e));
-        });
-        _monitor.OnMmrChanged += mmr => Dispatcher.Invoke(() =>
+        }));
+        _monitor.OnMmrChanged += mmr => Dispatcher.BeginInvoke(new Action(() =>
         {
             PlayerMmr.Text = mmr > 0 ? $"MMR: {mmr}" : "";
-        });
+        }));
 
         _monitor.Start();
         AppendLog("联赛工具已启动");
@@ -678,7 +680,10 @@ public partial class MainWindow : Window
 
     private void HandleMatchEvent(string json)
     {
+        // 逐条事件只在 Debug 落日志；正式包靠下面对状态分支的日志，避免日志文件被 ping/queue_count 刷屏
+#if DEBUG
         AppendLog("事件: " + json);
+#endif
         var type = TryParseStrField(json, "type");
         if (type == "state")
         {

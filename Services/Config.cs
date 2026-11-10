@@ -1,5 +1,8 @@
 using System;
 using System.IO;
+#if DEBUG
+using Newtonsoft.Json.Linq;
+#endif
 
 namespace HBT
 {
@@ -75,29 +78,31 @@ public class Config
     }
 
 #if DEBUG
+    /// <summary>
+    /// 解析 shared_config.json / config.json。
+    /// 用 Newtonsoft 真解析（此前是逐行手写解析，遇到缩进/嵌套/注释就失效）。
+    /// </summary>
     private static Config Parse(string path)
     {
         try
         {
-            var text = File.ReadAllText(path);
             var cfg = new Config();
+            var root = JObject.Parse(File.ReadAllText(path));
 
-            foreach (var line in text.Split('\n'))
+            var url = (string)root["apiBaseUrl"];
+            if (!string.IsNullOrWhiteSpace(url))
+                cfg.ApiBaseUrl = url.Trim();
+
+            var remap = root["testRemap"];
+            if (remap != null && remap.Type != JTokenType.Null)
             {
-                var trimmed = line.Trim();
-                if (!trimmed.StartsWith("\"")) continue;
-
-                var colonIdx = trimmed.IndexOf(':');
-                if (colonIdx < 0) continue;
-
-                var key = trimmed.Substring(1, trimmed.IndexOf('"', 1) - 1).Trim();
-                var valPart = trimmed.Substring(colonIdx + 1).Trim().TrimEnd(',');
-                var val = valPart.Trim('"');
-
-                if (key == "apiBaseUrl")
-                    cfg.ApiBaseUrl = val;
-                else if (key == "testRemap")
-                    cfg.TestRemap = val == "1" || val.Equals("true", StringComparison.OrdinalIgnoreCase);
+                if (remap.Type == JTokenType.Boolean)
+                    cfg.TestRemap = (bool)remap;
+                else
+                {
+                    var s = remap.ToString().Trim();
+                    cfg.TestRemap = s == "1" || s.Equals("true", StringComparison.OrdinalIgnoreCase);
+                }
             }
 
             Console.WriteLine($"[Config] apiBaseUrl={cfg.ApiBaseUrl} testRemap={cfg.TestRemap}");

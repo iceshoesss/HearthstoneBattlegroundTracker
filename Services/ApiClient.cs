@@ -28,9 +28,14 @@ public static class ApiClient
     private static string _baseUrl = "https://www.dazy.asia/";
     public static string BaseUrl => _baseUrl;
 
-    // API Key 编译时写入，不暴露给用户配置
-    // 发布前需替换为实际 Key
-    #if DEBUG
+    // ── 插件鉴权 Key（Release 编译时写入） ──
+    // 这是一把「共享凭证」而非秘密：它同时存在于 git 历史和发布的 exe 里，字符串一扫就能拿到。
+    // 因此服务端必须按低信任凭证处理：
+    //   - 只授予 /api/plugin/* 的上报权限，绝不给读管理数据 / 改配置的能力；
+    //   - 必须叠加 accountIdLo 身份校验 + 频控，不能只凭这把 Key 放行；
+    //   - 轮换：两端同时改，旧 Key 保留一个版本过渡期后下线。
+    // 若将来需要真正保密的凭证，应改为服务端下发短期 token，而不是继续往这里加常量。
+#if DEBUG
     private const string ApiKey = "";
 #else
     private const string ApiKey = "wangbadanandeluoni123";

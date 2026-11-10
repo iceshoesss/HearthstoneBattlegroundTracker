@@ -205,6 +205,8 @@ public class MatchSessionClient : IDisposable
                 using (var ws = new ClientWebSocket())
                 {
                     ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
+                    // ticket 同时放 Header：服务端读到后可停用 query 形式，避免进反代 access log
+                    try { ws.Options.SetRequestHeader("X-Match-Ticket", _ticket); } catch { }
                     var uri = BuildWsUri();
                     Console.WriteLine("[MATCH] WS 连接 " + uri);
                     await ws.ConnectAsync(uri, ct);
@@ -270,6 +272,10 @@ public class MatchSessionClient : IDisposable
             OnClosed?.Invoke();
     }
 
+    /// <summary>
+    /// ws(s)://…/api/plugin/match/ws?ticket=…
+    /// ticket 仍保留在 query（兼容现有服务端），同时以 X-Match-Ticket Header 发送。
+    /// </summary>
     private Uri BuildWsUri()
     {
         var http = _baseUrl;
