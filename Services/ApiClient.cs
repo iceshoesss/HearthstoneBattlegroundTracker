@@ -41,6 +41,42 @@ public static class ApiClient
     private const string ApiKey = "wangbadanandeluoni123";
 #endif
 
+    /// <summary>
+    /// 统一的接口结果。HTTP 与 WS 两条通道都归一到这个结构。
+    ///
+    /// 背景：服务端 WS 应答形如 {ok:false, error:'...', code:'placement_taken'}，
+    /// 旧代码只判断"有没有收到回复"，于是 409/400/429 全被记成成功——这是丢数据的根因。
+    /// </summary>
+    public sealed class ApiResult
+    {
+        /// <summary>HTTP 状态码；0 表示网络异常 / 未收到应答</summary>
+        public int Status;
+        /// <summary>原始响应体</summary>
+        public string Json = "";
+        public string Error = "";
+        /// <summary>业务错误码，如 placement_taken</summary>
+        public string Code = "";
+        /// <summary>服务端是否标记为可重试</summary>
+        public bool Retryable;
+
+        public bool Ok => Status >= 200 && Status < 300;
+        public bool IsNetworkError => Status == 0;
+        /// <summary>目标名次被占：服务端明确要求「稍后重试」</summary>
+        public bool PlacementTaken => Code == "placement_taken";
+        /// <summary>本人名次已记录（409 且不是 placement_taken）→ 数据已在库里，按成功处理</summary>
+        public bool AlreadyRecorded => Status == 409 && !PlacementTaken;
+
+        public override string ToString()
+        {
+            if (Ok) return "OK";
+            var sb = new StringBuilder();
+            sb.Append(IsNetworkError ? "网络异常" : Status.ToString());
+            if (!string.IsNullOrEmpty(Code)) sb.Append(' ').Append(Code);
+            if (!string.IsNullOrEmpty(Error)) sb.Append(" · ").Append(Error);
+            return sb.ToString();
+        }
+    }
+
     // X-HDT-Plugin：读程序集版本（csproj Version），与联赛工具窗口标题一致
     private static readonly string _pluginVersion = GetAssemblyVersion();
 
@@ -65,6 +101,11 @@ public static class ApiClient
 
     private static readonly HttpClient _http = new HttpClient(
         new HttpClientHandler { UseProxy = false }
+    ) { Timeout = TimeSpan.FromSeconds(15) };
+
+    /// <summary>直连失败时的兜底：走系统代理（部分选手开了代理/VPN，直连不通）</summary>
+    private static readonly HttpClient _httpProxied = new HttpClient(
+        new HttpClientHandler { UseProxy = true }
     ) { Timeout = TimeSpan.FromSeconds(15) };
 
     /// <summary>
@@ -188,22 +229,14 @@ public static class ApiClient
                 ["players"] = strangers,
             };
             Log($"[API] test remap-los：{strangers.Count} 个路人 → 等待组脚本位");
-            string json = null;
-            var ws = MatchSessionClient.Active;
-            if (ws != null && ws.IsConnected)
+            var res = await SendWithWsFallback("remap-los", "/api/plugin/test/remap-los", body, 8000);
+            if (!res.Ok)
             {
-                json = await ws.RequestAsync("remap-los", body, 8000);
-                if (json != null) Log("[API] remap-los 走 WS 成功");
+                Log("[API] test remap-los 失败: " + res);
+                return false;
             }
-            if (json == null)
-            {
-                var (ok, hjson) = await PostAsync("/api/plugin/test/remap-los", body);
-                if (!ok) return false;
-                json = hjson;
-                Log("[API] remap-los 走 HTTP 成功");
-            }
-            Log("[API] test remap-los 完成: " + json);
-            return json.Contains("\"ok\"") && json.Contains("true");
+            Log("[API] test remap-los 完成: " + res.Json);
+            return true;
         }
         catch (Exception e)
         {
@@ -232,7 +265,8 @@ public static class ApiClient
         if (validPlayers.Count == 0)
         {
             Console.WriteLine("[API] 所有 accountIdLo 为 0（LobbyInfo 未就绪），跳过 check-league");
-            return false;
+            // 返回 null 而不是 false：这是「暂时读不到」，不是「确认非联赛局」，要让调用方继续重试
+            return null;
         }
 
         // 构建 accountIdLoList
@@ -296,20 +330,16 @@ public static class ApiClient
 
         try
         {
-            // 主通道：match WS（一场一连）；失败退回 HTTP
-            string json = null;
-            var ws = MatchSessionClient.Active;
-            if (ws != null && ws.IsConnected)
+            var res = await SendWithWsFallback("check-league", "/api/plugin/check-league", body, 10000);
+            if (!res.Ok)
             {
-                json = await ws.RequestAsync("check-league", body, 10000);
-                if (json != null) Console.WriteLine("[API] check-league 走 WS 成功");
+                // 关键：任何失败都返回 null（=「结果未知，可重试」），绝不能返回 false。
+                // false 在调用方语义是「确认这不是联赛局」，会把一次 429/5xx 变成整局不上报。
+                LastError = res.ToString();
+                Console.WriteLine($"[API] ⚠️ check-league 失败（可重试）: {res}");
+                return null;
             }
-            if (json == null)
-            {
-                var (ok, hjson) = await PostAsync("/api/plugin/check-league", body);
-                if (!ok) return null; // HTTP 错误，调用方可重试
-                json = hjson;
-            }
+            var json = res.Json;
 
             // 解析响应
             // 无论 isLeague 结果如何，都提取 verificationCode
@@ -377,10 +407,14 @@ public static class ApiClient
 
         try
         {
-            var (ok, json) = await PostAsync("/api/plugin/initialize-player", body);
-            if (!ok) return false;
+            var res = await PostAsync("/api/plugin/initialize-player", body);
+            if (!res.Ok)
+            {
+                LastError = $"initialize-player {res}";
+                return false;
+            }
 
-            var vc = ExtractJsonString(json, "verificationCode");
+            var vc = ExtractJsonString(res.Json, "verificationCode");
             if (!string.IsNullOrEmpty(vc))
             {
                 VerificationCode = vc;
@@ -389,7 +423,7 @@ public static class ApiClient
             }
             else
             {
-                Console.WriteLine("[API] ⚠️ initialize-player 响应中无 verificationCode，json=" + json);
+                Console.WriteLine("[API] ⚠️ initialize-player 响应中无 verificationCode，json=" + res.Json);
             }
         }
         catch (Exception e)
@@ -403,7 +437,7 @@ public static class ApiClient
     /// <summary>
     /// 游戏结束时调用，上报排名
     /// </summary>
-    public static async Task<bool> UpdatePlacementAsync(
+    public static async Task<ApiResult> UpdatePlacementAsync(
         string gameUuid,
         string playerId,
         ulong accountIdLo,
@@ -436,53 +470,26 @@ public static class ApiClient
             body["otherPlacements"] = opList;
         }
 
-        // 重试 3 次
-        for (int attempt = 1; attempt <= 3; attempt++)
+        // 单次尝试（WS 优先 / HTTP 兜底）；重试、退避、持久化都在 UploadQueue 里做
+        var res = await SendWithWsFallback("update-placement", "/api/plugin/update-placement", body, 12000);
+        if (res.Ok)
         {
-            try
-            {
-                // 主通道 WS，失败退回 HTTP
-                string json = null;
-                var ws = MatchSessionClient.Active;
-                if (ws != null && ws.IsConnected)
-                {
-                    json = await ws.RequestAsync("update-placement", body, 12000);
-                    if (json != null) Console.WriteLine("[API] update-placement 走 WS 成功");
-                }
-                if (json == null)
-                {
-                    var (ok, hjson) = await PostAsync("/api/plugin/update-placement", body);
-                    if (!ok)
-                    {
-                        if (attempt < 3)
-                        {
-                            Console.WriteLine($"[API] update-placement 失败，第 {attempt} 次重试...");
-                            await Task.Delay(2000);
-                            continue;
-                        }
-                        return false;
-                    }
-                    json = hjson;
-                }
-
-                var finalized = ExtractJsonBool(json, "finalized");
-                Console.WriteLine($"[API] ✅ 排名已上传: 第 {placement} 名 | finalized={finalized}");
-                return true;
-            }
-            catch (Exception e)
-            {
-                if (attempt < 3)
-                {
-                    Console.WriteLine($"[API] update-placement 异常，第 {attempt} 次重试: {e.Message}");
-                    await Task.Delay(2000);
-                    continue;
-                }
-                LastError = $"update-placement 异常: {e.Message}";
-                Console.WriteLine($"[API] ⚠️ {LastError}");
-                return false;
-            }
+            var written = ExtractJsonString(res.Json, "written");
+            var kept = ExtractJsonString(res.Json, "kept");
+            var skipped = ExtractJsonString(res.Json, "skipped");
+            Console.WriteLine($"[API] ✅ 排名已上传: 第 {placement} 名 | finalized={ExtractJsonBool(res.Json, "finalized")} written={written} kept={kept} skipped={skipped}");
+            // 200 但一行没写：多半是 accountIdLo 不在本局 roster 里，别把它当成成功
+            var wroteNothing = (string.IsNullOrEmpty(written) || written == "0")
+                               && (string.IsNullOrEmpty(kept) || kept == "0");
+            if (wroteNothing)
+                Console.WriteLine("[API] ⚠️ 服务端 200 但未写入任何行（accountIdLo 可能不在本局名单内），请核对 roster");
         }
-        return false;
+        else
+        {
+            LastError = $"update-placement {res}";
+            Console.WriteLine($"[API] ⚠️ update-placement 未写入: {res}");
+        }
+        return res;
     }
 
     /// <summary>
@@ -535,19 +542,15 @@ public static class ApiClient
 
         try
         {
-            string json = null;
-            var ws = MatchSessionClient.Active;
-            if (ws != null && ws.IsConnected)
+            var res = await SendWithWsFallback("check-league", "/api/plugin/check-league", body, 10000);
+            if (!res.Ok)
             {
-                json = await ws.RequestAsync("check-league", body, 10000);
-                if (json != null) Console.WriteLine("[API] check-league(constructed) 走 WS 成功");
+                // 与 BG 版本一致：失败一律返回 null（可重试），不要把错误当成「非联赛局」
+                LastError = res.ToString();
+                Console.WriteLine($"[API] ⚠️ check-league(constructed) 失败（可重试）: {res}");
+                return null;
             }
-            if (json == null)
-            {
-                var (ok, hjson) = await PostAsync("/api/plugin/check-league", body);
-                if (!ok) return null;
-                json = hjson;
-            }
+            var json = res.Json;
 
             var vc = ExtractJsonString(json, "verificationCode");
             if (!string.IsNullOrEmpty(vc))
@@ -616,46 +619,14 @@ public static class ApiClient
             ["placements"] = placements,
         };
 
-        for (int attempt = 1; attempt <= 3; attempt++)
+        var res = await SendWithWsFallback("update-placement", "/api/plugin/update-placement", body, 12000);
+        if (res.Ok)
         {
-            try
-            {
-                string json = null;
-                var ws = MatchSessionClient.Active;
-                if (ws != null && ws.IsConnected)
-                {
-                    json = await ws.RequestAsync("update-placement", body, 12000);
-                    if (json != null) Console.WriteLine("[API] update-placement(constructed) 走 WS 成功");
-                }
-                if (json == null)
-                {
-                    var (ok, hjson) = await PostAsync("/api/plugin/update-placement", body);
-                    if (ok) json = hjson;
-                }
-                if (json != null)
-                {
-                    Console.WriteLine($"[API] ✅ 双方结果已上传: 本机={localPlacement} 对手={oppPlacement}");
-                    return true;
-                }
-                if (attempt < 3)
-                {
-                    Console.WriteLine($"[API] update-placement 失败，第 {attempt} 次重试...");
-                    await Task.Delay(2000);
-                }
-            }
-            catch (Exception e)
-            {
-                if (attempt < 3)
-                {
-                    Console.WriteLine($"[API] update-placement 重试异常: {e.Message}");
-                    await Task.Delay(2000);
-                    continue;
-                }
-                LastError = $"update-placement 异常: {e.Message}";
-                Console.WriteLine($"[API] ⚠️ {LastError}");
-                return false;
-            }
+            Console.WriteLine($"[API] ✅ 双方结果已上传: 本机={localPlacement} 对手={oppPlacement}");
+            return true;
         }
+        LastError = $"update-placement(constructed) {res}";
+        Console.WriteLine($"[API] ⚠️ {LastError}");
         return false;
     }
 
@@ -699,8 +670,12 @@ public static class ApiClient
 
         try
         {
-            var (ok, json) = await PostAsync("/api/plugin/report-game-stats", body);
-            if (!ok) return false;
+            var res = await PostAsync("/api/plugin/report-game-stats", body);
+            if (!res.Ok)
+            {
+                LastError = $"report-game-stats {res}";
+                return false;
+            }
             Console.WriteLine($"[API] ✅ 游戏统计已上报: rating={rating}, board={boardState?.Count ?? 0} cards");
             return true;
         }
@@ -724,21 +699,22 @@ public static class ApiClient
     public static async Task<QueueJoinResult> QueueJoinAsync(string battleTag)
     {
         var body = new Dictionary<string, object> { { "battleTag", battleTag } };
-        var (ok, json) = await PostAsync("/api/plugin/queue/join", body);
-        if (!ok) { LastError = json; return new QueueJoinResult(); }
+        var res = await PostAsync("/api/plugin/queue/join", body);
+        if (!res.Ok) { LastError = res.ToString(); return new QueueJoinResult(); }
         return new QueueJoinResult
         {
-            Ticket = ExtractJsonString(json, "ticket"),
-            State = ExtractJsonString(json, "state"),
-            TableNamesJson = ExtractJsonArray(json, "tableNames"),
+            Ticket = ExtractJsonString(res.Json, "ticket"),
+            State = ExtractJsonString(res.Json, "state"),
+            TableNamesJson = ExtractJsonArray(res.Json, "tableNames"),
         };
     }
 
     public static async Task<bool> QueueLeaveAsync(string ticket)
     {
         var body = new Dictionary<string, object> { { "ticket", ticket } };
-        var (ok, json) = await PostAsync("/api/plugin/queue/leave", body);
-        return ok;
+        var res = await PostAsync("/api/plugin/queue/leave", body);
+        if (!res.Ok) LastError = res.ToString();
+        return res.Ok;
     }
 
     public static async Task<bool> ConfirmPlacementAsync(string ticket, int placement, bool okConfirm)
@@ -749,37 +725,140 @@ public static class ApiClient
             { "placement", placement },
             { "ok", okConfirm },
         };
-        var (ok, json) = await PostAsync("/api/plugin/confirm-placement", body);
-        return ok;
+        var res = await PostAsync("/api/plugin/confirm-placement", body);
+        if (!res.Ok) LastError = res.ToString();
+        return res.Ok;
     }
 
     // ── HTTP 工具方法 ──
 
-    private static async Task<(bool ok, string json)> PostAsync(string path, Dictionary<string, object> body)
+    private static async Task<ApiResult> PostAsync(string path, Dictionary<string, object> body)
     {
-        var url = _baseUrl + path;
         var jsonBody = SimpleJsonSerialize(body);
-        var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-
         Console.WriteLine($"[API] → {path} body={jsonBody}");
 
-        var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
-        request.Headers.Add("X-HDT-Plugin", _pluginVersion);
-        if (!string.IsNullOrEmpty(ApiKey))
-            request.Headers.Add("Authorization", $"Bearer {ApiKey}");
+        var res = await PostOnce(path, jsonBody, _http);
+        if (!res.IsNetworkError) return res;
 
-        var response = await _http.SendAsync(request);
-        var respBody = await response.Content.ReadAsStringAsync();
-
-        Console.WriteLine($"[API] ← {path} {(int)response.StatusCode} {respBody}");
-
-        if (!response.IsSuccessStatusCode)
+        // 直连挂了再试系统代理：有的选手挂 VPN/代理，直连必然失败
+        var proxied = await PostOnce(path, jsonBody, _httpProxied);
+        if (!proxied.IsNetworkError)
         {
-            Console.WriteLine($"[API] ❌ {path} → {(int)response.StatusCode} {respBody}");
-            return (false, respBody);
+            Console.WriteLine($"[API] ℹ️ {path} 直连失败，经系统代理成功");
+            return proxied;
+        }
+        return res;
+    }
+
+    private static async Task<ApiResult> PostOnce(string path, string jsonBody, HttpClient client)
+    {
+        var res = new ApiResult();
+        try
+        {
+            using (var content = new StringContent(jsonBody, Encoding.UTF8, "application/json"))
+            using (var request = new HttpRequestMessage(HttpMethod.Post, _baseUrl + path) { Content = content })
+            {
+                request.Headers.Add("X-HDT-Plugin", _pluginVersion);
+                if (!string.IsNullOrEmpty(ApiKey))
+                    request.Headers.Add("Authorization", $"Bearer {ApiKey}");
+
+                var response = await client.SendAsync(request);
+                var respBody = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[API] ← {path} {(int)response.StatusCode} {respBody}");
+                FillFromBody(res, (int)response.StatusCode, respBody);
+                if (!res.Ok) Console.WriteLine($"[API] ❌ {path} → {res}");
+                return res;
+            }
+        }
+        catch (Exception e)
+        {
+            // 超时 / DNS / TLS / 拒连：统一按可重试的网络错误处理，不再让异常冒到调用方
+            res.Status = 0;
+            res.Error = e.GetType().Name + ": " + e.Message;
+            res.Retryable = true;
+            Console.WriteLine($"[API] ❌ {path} 网络异常: {res.Error}");
+            return res;
+        }
+    }
+
+    /// <summary>把响应体里的业务字段填进 ApiResult（HTTP 与 WS 共用）</summary>
+    private static void FillFromBody(ApiResult res, int status, string body)
+    {
+        res.Status = status;
+        res.Json = body ?? "";
+        if (res.Ok) return;
+        res.Error = ExtractJsonString(res.Json, "error");
+        res.Code = ExtractJsonString(res.Json, "code");
+        res.Retryable = ExtractJsonBool(res.Json, "retryable")
+                        || status == 0 || status == 429 || status >= 500;
+    }
+
+    /// <summary>
+    /// WS 请求-应答的回复体 → ApiResult。
+    /// 服务端回复形如 {type:"update-placement_result", reqId, ok:true/false, error, code, ...业务字段}。
+    /// </summary>
+    private static ApiResult FromWsReply(string json)
+    {
+        var res = new ApiResult();
+        if (string.IsNullOrEmpty(json))
+        {
+            res.Status = 0;
+            res.Error = "WS 无应答";
+            res.Retryable = true;
+            return res;
+        }
+        res.Json = json;
+        res.Code = ExtractJsonString(json, "code");
+        res.Error = ExtractJsonString(json, "error");
+
+        // 服务端若带 status 就直接采信；否则按 ok 推断（200 / 400）
+        int status;
+        if (!int.TryParse(ExtractJsonString(json, "status"), out status) || status <= 0)
+            status = ExtractJsonBool(json, "ok") ? 200 : 400;
+
+        // ok:false 且没有 status 时，用错误码/文案还原真实语义。
+        // 关键取舍：认不出来的错误按 503（可重试）处理——宁可多试几次，
+        // 也不能把一个服务端 5xx 误判成 400 把数据丢掉。
+        if (status == 400)
+        {
+            if (res.Code == "placement_taken") status = 409;
+            else if (!string.IsNullOrEmpty(res.Error) && res.Error.Contains("已提交")) status = 409;
+            else if (!string.IsNullOrEmpty(res.Error) && res.Error.Contains("过于频繁")) status = 429;
+            else if (!string.IsNullOrEmpty(res.Error)
+                     && (res.Error.Contains("1-8") || res.Error.Contains("对局不存在") || res.Error.Contains("gameUuid")))
+                status = 400;   // 明确的不可恢复错误
+            else
+                status = 503;   // 未知错误：按可重试处理
         }
 
-        return (true, respBody);
+        FillFromBody(res, status, json);
+        return res;
+    }
+
+    /// <summary>
+    /// 单次请求：WS 优先，无应答时退回 HTTP。
+    /// 注意「WS 有应答但 ok:false」不会退回 HTTP——那是对端明确的业务结论，重复发只会制造 409。
+    /// 重试由调用方（UploadQueue）按 ApiResult 语义处理。
+    /// </summary>
+    private static async Task<ApiResult> SendWithWsFallback(
+        string wsType, string httpPath, Dictionary<string, object> body, int wsTimeoutMs)
+    {
+        var ws = MatchSessionClient.Active;
+        if (ws != null && ws.IsConnected)
+        {
+            var reply = await ws.RequestAsync(wsType, body, wsTimeoutMs);
+            if (reply != null)
+            {
+                var r = FromWsReply(reply);
+                Console.WriteLine($"[API] {wsType} WS → {r}");
+                return r;
+            }
+            Console.WriteLine($"[API] {wsType} WS 超时无应答，退回 HTTP");
+        }
+
+        var http = await PostAsync(httpPath, body);
+        Console.WriteLine($"[API] {wsType} HTTP → {http}");
+        return http;
     }
 
     // ── 极简 JSON 序列化（避免依赖第三方库） ──

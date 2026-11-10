@@ -47,8 +47,13 @@ public class MatchSessionClient : IDisposable
             var buf = Encoding.UTF8.GetBytes(json ?? "{}");
             lock (_sendLock)
             {
-                ws.SendAsync(new ArraySegment<byte>(buf), WebSocketMessageType.Text, true, CancellationToken.None)
-                    .Wait(2000);
+                // 发送超时必须算失败：半死连接上 SendAsync 会一直挂着，旧代码忽略了 Wait 结果
+                var send = ws.SendAsync(new ArraySegment<byte>(buf), WebSocketMessageType.Text, true, CancellationToken.None);
+                if (!send.Wait(2000))
+                {
+                    Console.WriteLine("[MATCH] WS 发送超时（连接可能已半死）");
+                    return false;
+                }
             }
             return true;
         }

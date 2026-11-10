@@ -234,9 +234,10 @@ public class LeagueClient
         ulong accountIdLo, int placement, List<string> reconnectTimes,
         List<(ulong lo, int placement)> otherPlacements)
     {
-        return await ApiClient.UpdatePlacementAsync(
+        var res = await ApiClient.UpdatePlacementAsync(
             gameUuid, playerTag, accountIdLo, placement,
             reconnectTimes, otherPlacements);
+        return res.Ok;
     }
 
     /// <summary>重置状态（PID 变化时）</summary>
