@@ -45,7 +45,7 @@ public partial class App : Application
             }
         }
 
-        // HearthMirror + BobsBuddy assembly resolve
+        // BattlegroundSpy / BattlegroundDB 程序集解析（Lib/ 优先）
         AppDomain.CurrentDomain.AssemblyResolve += (_, args) =>
         {
             var asmName = new AssemblyName(args.Name).Name;

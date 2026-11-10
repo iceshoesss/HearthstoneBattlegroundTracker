@@ -437,9 +437,7 @@ public class GameMonitorService : IDisposable
                 _gameGeneration++;
                 _league.Reset();
                 _currentGameUuid = "";
-                // 每局拔线次数清零，不跨局累计
-                DisconnectService.ResetReconnectCount();
-                DisconnectService.EndReconnect();
+                // 每局拔线次数清零，不跨局累计（重连时由 Parser 追加时间戳）
                 _currentGame.ReconnectTimes.Clear();
                 SetPhase(GamePhase.PreLobby);
                 if (!string.IsNullOrEmpty(_currentGame.HeroName))
@@ -453,33 +451,28 @@ public class GameMonitorService : IDisposable
                 // 注意：重连时不清空 EntityTracker，因为游戏仍在进行中，现有数据仍然有效
                 // EntityTracker 会在新游戏开始时（GameStartEvent）被清空
 
-                // 参考团子版：重连状态管理
-                DisconnectService.ReconnectCount++;
-                Log($"断线重连 (ReconnectCount={DisconnectService.ReconnectCount})");
+                // 拔线/重连状态只做计数（拔线功能已从 basic 分支移除）
+                Log($"断线重连 (第 {_currentGame.ReconnectTimes.Count} 次)");
 
                 if (_gameState.IsConstructed)
                 {
                     Log("断线重连 - 构筑模式，跳过BG流程");
-                    DisconnectService.EndReconnect();
                 }
                 else if (!string.IsNullOrEmpty(_currentGameUuid))
                 {
                     SetPhase(GamePhase.Active);
-                    DisconnectService.EndReconnect();
                     Log("断线重连 - 已有联赛对局");
                     // EntityTracker 数据仍然有效，无需重建映射
                 }
                 else if (_currentGame.LobbyPlayers.Count == 0)
                 {
                     SetPhase(GamePhase.PreLobby);
-                    DisconnectService.EndReconnect();
                     Log("断线重连 - 获取大厅信息");
                     HandleCheckLeague();
                 }
                 else
                 {
                     // 已有大厅信息（BGSpy 启动时获取），跳过重复获取
-                    DisconnectService.EndReconnect();
                     Log("断线重连 - 已有大厅信息，跳过");
                 }
                 break;
@@ -764,10 +757,6 @@ public class GameMonitorService : IDisposable
     {
         _league.StopRetry();
         SetPhase(GamePhase.PostGame);
-
-        // 游戏结束时清空拔线缓存（与团子版对齐：HandleGameEnd 立即禁用拔线）
-        DisconnectService.IsGameEnded = true;
-        DisconnectService.EndReconnect();
 
         var placement = evt.Placement;
 
@@ -1140,8 +1129,6 @@ public class GameMonitorService : IDisposable
         _startMmr = 0;
         _gameGeneration++;
         _league.Reset();
-        DisconnectService.EndReconnect(); // 清除拔线状态
-        DisconnectService.ResetReconnectCount(); // 每局拔线次数清零，不跨局累计
         ResetPlayerInfo();
         OnPhaseChanged?.Invoke(GamePhase.Idle, _currentGame);
     }
