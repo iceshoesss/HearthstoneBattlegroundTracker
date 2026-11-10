@@ -36,7 +36,7 @@ Requires Hearthstone to be running. Cannot run in CI or headless environments.
 ## Key Facts
 
 - Windows-only (WPF + AnyCPU)
-- Version lives in both `HearthstoneBattlegroundTracker.csproj` and `BattlegroundSpy/BattlegroundSpy.csproj` — update both when bumping
+- Version: HBT (`HearthstoneBattlegroundTracker.csproj`) and BattlegroundSpy (`BattlegroundSpy/BattlegroundSpy.csproj`) are versioned **independently** — they need not match; bumping one does not require touching the other. Only the main assembly version is reported to the server via `X-HDT-Plugin`
 - `DefaultItemExcludes` in main csproj excludes `BattlegroundSpy\**` and `BattlegroundSpy.Test\**` — they build independently
 - UnitySpy source path is relative (`../../HDT_Reverse/unity-spy/`) — won't resolve outside the original dev machine layout
 - No CI workflows, no linting, no formatter configured
